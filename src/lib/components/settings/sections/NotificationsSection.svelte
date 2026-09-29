@@ -13,6 +13,9 @@
   import type { CustomAudioInfo } from '$lib/types';
   import * as m from '$paraglide/messages.js';
   import { warn, error as logError } from '@tauri-apps/plugin-log';
+  import { getLocale } from '$paraglide/runtime.js';
+
+  let zh = $derived.by(() => { void $settings.language; return getLocale().startsWith('zh'); });
 
   type CueKey = keyof CustomAudioInfo;
 
@@ -30,19 +33,23 @@
   let workAlert = $state<string | null>(null);
   let shortBreakAlert = $state<string | null>(null);
   let longBreakAlert = $state<string | null>(null);
+  let buttonClick = $state<string | null>(null);
 
   function getFileName(id: CueKey): string | null {
     if (id === 'work_alert') return workAlert;
     if (id === 'short_break_alert') return shortBreakAlert;
+    if (id === 'button_click') return buttonClick;
     return longBreakAlert;
   }
 
   function setFileName(id: CueKey, val: string | null) {
     if (id === 'work_alert') workAlert = val;
     else if (id === 'short_break_alert') shortBreakAlert = val;
+    else if (id === 'button_click') buttonClick = val;
     else longBreakAlert = val;
   }
 
+  let buttonClickError = $state<string | null>(null);
   let workAlertError = $state<string | null>(null);
   let shortBreakAlertError = $state<string | null>(null);
   let longBreakAlertError = $state<string | null>(null);
@@ -50,12 +57,14 @@
   function getError(id: CueKey): string | null {
     if (id === 'work_alert') return workAlertError;
     if (id === 'short_break_alert') return shortBreakAlertError;
+    if (id === 'button_click') return buttonClickError;
     return longBreakAlertError;
   }
 
   function setError(id: CueKey, val: string | null) {
     if (id === 'work_alert') workAlertError = val;
     else if (id === 'short_break_alert') shortBreakAlertError = val;
+    else if (id === 'button_click') buttonClickError = val;
     else longBreakAlertError = val;
   }
 
@@ -65,6 +74,7 @@
       workAlert = info.work_alert;
       shortBreakAlert = info.short_break_alert;
       longBreakAlert = info.long_break_alert;
+      buttonClick = info.button_click;
     } catch (err) {
       await warn(`[audio] getCustomAudioInfo failed (audio unavailable?): ${err}`);
     }
@@ -122,237 +132,134 @@
   }
 </script>
 
-<div class="section">
-  <div class="group-heading">{m.notif_group_alert()}</div>
-
-  {#each CUE_LIST as { id, label } (id)}
-    <div class="audio-row">
-      <div class="audio-meta">
-        <span class="label">{label()}</span>
-        <span class="file-name" class:custom={getFileName(id) !== null}>
-          {getFileName(id) ?? m.notif_audio_default()}
-        </span>
-      </div>
-      <div class="audio-actions">
-        {#if getFileName(id) !== null}
-          <button class="btn-restore" onclick={() => restoreAudio(id)}
-            >{m.notif_btn_restore()}</button
-          >
-        {/if}
-        <button class="btn-choose" onclick={() => pickAudio(id)}>{m.notif_btn_choose()}</button>
-      </div>
+<div class="s-groups">
+  <section class="s-group">
+    <h3 class="s-group-title">{m.notif_group_alert()}</h3>
+    <div class="s-card">
+      {#each CUE_LIST as { id, label } (id)}
+        <div class="s-row">
+          <div class="s-text">
+            <span class="s-label">{label()}</span>
+            {#if getError(id)}
+              <span class="s-hint error" role="alert">{getError(id)}</span>
+            {:else}
+              <span class="file-name" class:custom={getFileName(id) !== null}>
+                {getFileName(id) ?? m.notif_audio_default()}
+              </span>
+            {/if}
+          </div>
+          <div class="s-control">
+            {#if getFileName(id) !== null}
+              <button class="s-btn s-btn--ghost" onclick={() => restoreAudio(id)}>{m.notif_btn_restore()}</button>
+            {/if}
+            <button class="s-btn" onclick={() => pickAudio(id)}>{m.notif_btn_choose()}</button>
+          </div>
+        </div>
+      {/each}
     </div>
-    {#if getError(id)}
-      <p class="audio-error">{getError(id)}</p>
-    {/if}
-  {/each}
+  </section>
 
-  <div class="group-heading">{m.notif_group_desktop()}</div>
-
-  <SettingsToggle
-    label={m.notif_toggle_desktop()}
-    description={m.notif_toggle_desktop_desc()}
-    checked={$settings.notifications_enabled}
-    onclick={() => toggle('notifications', $settings.notifications_enabled)}
-  />
-
-  <div class="group-heading">{m.notif_group_tick()}</div>
-
-  <SettingsToggle
-    label={m.notif_toggle_tick_work()}
-    description={m.notif_toggle_tick_work_desc()}
-    checked={$settings.tick_sounds_during_work}
-    onclick={() => toggle('tick_sounds_work', $settings.tick_sounds_during_work)}
-  />
-  <SettingsToggle
-    label={m.notif_toggle_tick_break()}
-    description={m.notif_toggle_tick_break_desc()}
-    checked={$settings.tick_sounds_during_break}
-    onclick={() => toggle('tick_sounds_break', $settings.tick_sounds_during_break)}
-  />
-
-  <div class="group-heading">{m.notif_group_volume()}</div>
-
-  <div class="volume-row">
-    <div class="volume-meta">
-      <span class="label">{m.notif_label_volume()}</span>
-      <span class="value">{Math.round(localVolume * 100)}%</span>
-    </div>
-    <div class="slider-wrap">
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={localVolume}
-        class="slider"
-        oninput={handleVolumeInput}
+  <section class="s-group">
+    <h3 class="s-group-title">{zh ? '按钮音效' : 'Button sound'}</h3>
+    <div class="s-card">
+      <SettingsToggle
+        label={zh ? '点击红色按钮时发声' : 'Play a sound on red buttons'}
+        description={zh ? '开始、暂停、继续和确认类按钮按下时，发出一声轻轻的“嗒”。音量跟随下方的音量设置。' : 'A soft “tok” when you press start, pause, resume and other primary buttons. Uses the volume below.'}
+        checked={$settings.click_sound_enabled}
+        onclick={() => toggle('click_sound_enabled', $settings.click_sound_enabled)}
       />
-      <div class="bar" style="width: {localVolume * 100}%"></div>
+      <div class="s-row" class:is-disabled={!$settings.click_sound_enabled}>
+        <div class="s-text">
+          <span class="s-label">{zh ? '按钮音效' : 'Button sound'}</span>
+          {#if getError('button_click')}
+            <span class="s-hint error" role="alert">{getError('button_click')}</span>
+          {:else}
+            <span class="file-name" class:custom={buttonClick !== null}>{buttonClick ?? (zh ? '默认 · 木质“嗒”' : 'Default · wooden tok')}</span>
+          {/if}
+        </div>
+        <div class="s-control">
+          {#if buttonClick !== null}
+            <button class="s-btn s-btn--ghost" onclick={() => restoreAudio('button_click')}>{m.notif_btn_restore()}</button>
+          {/if}
+          <button class="s-btn" onclick={() => pickAudio('button_click')}>{m.notif_btn_choose()}</button>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <section class="s-group">
+    <h3 class="s-group-title">{m.notif_group_desktop()}</h3>
+    <div class="s-card">
+      <SettingsToggle
+        label={m.notif_toggle_desktop()}
+        description={m.notif_toggle_desktop_desc()}
+        checked={$settings.notifications_enabled}
+        onclick={() => toggle('notifications', $settings.notifications_enabled)}
+      />
+    </div>
+  </section>
+
+  <section class="s-group">
+    <h3 class="s-group-title">{m.notif_group_tick()}</h3>
+    <div class="s-card">
+      <SettingsToggle
+        label={m.notif_toggle_tick_work()}
+        description={m.notif_toggle_tick_work_desc()}
+        checked={$settings.tick_sounds_during_work}
+        onclick={() => toggle('tick_sounds_work', $settings.tick_sounds_during_work)}
+      />
+      <SettingsToggle
+        label={m.notif_toggle_tick_break()}
+        description={m.notif_toggle_tick_break_desc()}
+        checked={$settings.tick_sounds_during_break}
+        onclick={() => toggle('tick_sounds_break', $settings.tick_sounds_during_break)}
+      />
+    </div>
+  </section>
+
+  <section class="s-group">
+    <h3 class="s-group-title">{m.notif_group_volume()}</h3>
+    <div class="s-card">
+      <div class="s-row stacked">
+        <div class="meta">
+          <span class="s-label">{m.notif_label_volume()}</span>
+          <span class="s-value">{Math.round(localVolume * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={localVolume}
+          class="s-range"
+          aria-label={m.notif_label_volume()}
+          style:--frac={localVolume}
+          oninput={handleVolumeInput}
+        />
+      </div>
+    </div>
+  </section>
 </div>
 
 <style>
-  .section {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .group-heading {
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-foreground-darker, var(--color-foreground));
-    opacity: 0.6;
-    margin: 0;
-    padding: 16px 20px 6px;
-  }
-
-  .volume-row {
-    padding: 10px 20px 14px;
-    border-bottom: 1px solid var(--color-separator);
-  }
-
-  .volume-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 10px;
-  }
-
-  .label {
-    font-size: 0.85rem;
-    color: var(--color-foreground);
-    letter-spacing: 0.02em;
-  }
-
-  .value {
-    font-size: 0.8rem;
-    font-family: monospace;
-    color: var(--color-foreground-darker, var(--color-foreground));
-    background: var(--color-hover);
-    padding: 2px 8px;
-    border-radius: 3px;
-  }
-
-  .slider-wrap {
-    position: relative;
-    height: 20px;
-    display: flex;
-    align-items: center;
-  }
-
-  .slider {
-    position: relative;
-    z-index: 2;
-    width: 100%;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 4px;
-    background: color-mix(in oklch, var(--color-foreground) 14%, transparent);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-
-  .slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--color-foreground);
-    cursor: pointer;
-  }
-
-  .slider::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--color-foreground);
-    cursor: pointer;
-    border: none;
-  }
-
-  .bar {
-    position: absolute;
-    left: 0;
-    height: 4px;
-    border-radius: 2px;
-    pointer-events: none;
-    z-index: 1;
-    background: var(--color-accent);
-    transition: width 0.05s;
-  }
-
-  .audio-row {
+  .meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 10px 20px;
-    border-bottom: 1px solid var(--color-separator);
-  }
-
-  .audio-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
   }
 
   .file-name {
-    font-size: 0.72rem;
-    font-family: monospace;
-    color: var(--color-foreground-darker, rgba(255, 255, 255, 0.35));
+    font-size: 12.5px;
+    font-family: 'Mona Sans Mono', ui-monospace, monospace;
+    color: var(--ui-text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 180px;
   }
 
   .file-name.custom {
-    color: var(--color-accent);
-  }
-
-  .audio-actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .btn-choose,
-  .btn-restore {
-    font-size: 0.72rem;
-    padding: 4px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    border: 1px solid color-mix(in oklch, var(--color-foreground) 20%, transparent);
-    background: var(--color-hover);
-    color: var(--color-foreground);
-    transition: background 0.15s;
-    white-space: nowrap;
-  }
-
-  .btn-choose:hover {
-    background: color-mix(in oklch, var(--color-foreground) 17%, transparent);
-  }
-
-  .btn-restore {
-    color: var(--color-foreground-darker, rgba(255, 255, 255, 0.5));
-  }
-
-  .btn-restore:hover {
-    background: color-mix(in oklch, var(--color-foreground) 14%, transparent);
-    color: var(--color-foreground);
-  }
-
-  .audio-error {
-    margin: 0;
-    padding: 2px 20px 8px;
-    font-size: 0.72rem;
-    color: var(--color-danger, #e05252);
-    font-family: monospace;
+    color: var(--ui-brand-strong);
+    font-weight: 600;
   }
 </style>

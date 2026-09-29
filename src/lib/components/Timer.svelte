@@ -20,7 +20,12 @@
   import TimerDisplay from './TimerDisplay.svelte';
   import TimerFooter from './TimerFooter.svelte';
   import MiniControls from './MiniControls.svelte';
+  import SubjectPicker from './SubjectPicker.svelte';
   import Tooltip from './Tooltip.svelte';
+  import PlayfulTimer from './PlayfulTimer.svelte';
+  import ClassicTimer from './classic/ClassicTimer.svelte';
+  import { activeTheme } from '$lib/stores/theme';
+  import { collectionFor } from '$lib/themes/collection';
   import type { UnlistenFn } from '@tauri-apps/api/event';
   import * as m from '$paraglide/messages.js';
   import { notificationShow } from '$lib/ipc';
@@ -44,6 +49,10 @@
     if (rt === 'work') return m.round_label_work();
     if (rt === 'short-break') return m.round_label_short_break();
     return m.round_label_long_break();
+  }
+
+  function roundTextColor(rt: string): string {
+    return `var(--text-${rt === 'work' ? 'focus' : rt === 'short-break' ? 'short' : 'long'}-round, ${roundColor(rt)})`;
   }
 
   onMount(() => {
@@ -114,6 +123,11 @@
 </script>
 
 <div class="timer-outer" class:compact={isCompact}>
+  {#if collectionFor($activeTheme)?.id === 'classic-tomato'}
+    <ClassicTimer {state} {uiScale} compact={isCompact} />
+  {:else if collectionFor($activeTheme)}
+    <PlayfulTimer {state} {uiScale} compact={isCompact} />
+  {:else}
   <div class="timer" style="zoom: {uiScale}">
     <!-- Dial + display stacked (display centered over dial) -->
     <div class="dial-stack">
@@ -124,9 +138,11 @@
     {#if !isCompact}
       <!-- Round type label sits below the dial as a normal flex child so it
            does not affect the dial-stack height used to centre TimerDisplay. -->
-      <div class="round-label" style="color: {roundColor(state.round_type)}">
+      <div class="round-label" style="color: {roundTextColor(state.round_type)}">
         {roundLabel(state.round_type)}
       </div>
+
+      <SubjectPicker />
 
       <div class="controls-wrapper">
         <!-- Back: restart current round -->
@@ -178,6 +194,7 @@
 
   {#if isCompact}
     <MiniControls />
+  {/if}
   {/if}
 </div>
 
@@ -265,11 +282,11 @@
   }
 
   .round-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
     /* Collapse the gap above: the flex gap already provides spacing from the dial. */
-    margin-top: -8px;
+    margin-top: -6px;
   }
 </style>

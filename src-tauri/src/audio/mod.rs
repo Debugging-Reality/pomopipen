@@ -1,6 +1,6 @@
 /// Rust audio playback via rodio.
 ///
-/// All four audio assets are embedded at compile time so they are available
+/// All audio assets are embedded at compile time so they are available
 /// even when the app is hidden to the system tray.
 ///
 /// Architecture:
@@ -11,12 +11,13 @@
 /// Custom audio:
 ///   Per-cue custom files are stored in `{app_data_dir}/audio/` with fixed
 ///   stems (`custom_work_alert`, `custom_short_break_alert`,
-///   `custom_long_break_alert`). The audio thread tries the custom file first
+///   `custom_long_break_alert`, `custom_button_click`). The audio thread tries the custom file first
 ///   and falls back to the embedded bytes if the file is missing or unreadable.
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
+use std::time::Duration;
 
 use rodio::{Decoder, DeviceSinkBuilder, Player};
 
@@ -30,6 +31,8 @@ const ALERT_WORK: &[u8] = include_bytes!("../../../static/audio/alert-work.mp3")
 const ALERT_SHORT_BREAK: &[u8] = include_bytes!("../../../static/audio/alert-short-break.mp3");
 const ALERT_LONG_BREAK: &[u8] = include_bytes!("../../../static/audio/alert-long-break.mp3");
 const TICK: &[u8] = include_bytes!("../../../static/audio/tick.mp3");
+/// Short wooden "tok" for the primary (red) buttons; synthesized for this app.
+const BUTTON_CLICK: &[u8] = include_bytes!("../../../static/audio/click.wav");
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -41,15 +44,17 @@ pub enum AudioCue {
     ShortBreakAlert,
     LongBreakAlert,
     Tick,
+    ButtonClick,
 }
 
-/// Paths to currently active custom audio files (one per alert cue).
+/// Paths to currently active custom audio files (one per customizable cue).
 /// `None` means the embedded default is used.
 #[derive(Default)]
 pub struct CustomAudioPaths {
     pub work_alert: Option<PathBuf>,
     pub short_break_alert: Option<PathBuf>,
     pub long_break_alert: Option<PathBuf>,
+    pub button_click: Option<PathBuf>,
 }
 
 /// Serialisable snapshot of custom audio file names (sent to the frontend).
@@ -58,6 +63,7 @@ pub struct CustomAudioInfo {
     pub work_alert: Option<String>,
     pub short_break_alert: Option<String>,
     pub long_break_alert: Option<String>,
+    pub button_click: Option<String>,
 }
 
 struct PlayRequest {
@@ -130,6 +136,7 @@ impl AudioManager {
                 AudioCue::WorkAlert => paths.work_alert.clone(),
                 AudioCue::ShortBreakAlert => paths.short_break_alert.clone(),
                 AudioCue::LongBreakAlert => paths.long_break_alert.clone(),
+                AudioCue::ButtonClick => paths.button_click.clone(),
                 AudioCue::Tick => None,
             }
         };
@@ -146,13 +153,14 @@ impl AudioManager {
     }
 
     /// Set a custom file path for the given cue slot.
-    /// `cue` must be `"work_alert"`, `"short_break_alert"`, or `"long_break_alert"`.
+    /// `cue` must be `"work_alert"`, `"short_break_alert"`, `"long_break_alert"` or `"button_click"`.
     pub fn set_custom_path(&self, cue: &str, path: PathBuf) {
         let mut paths = self.custom_paths.lock().unwrap();
         match cue {
             "work_alert" => paths.work_alert = Some(path),
             "short_break_alert" => paths.short_break_alert = Some(path),
             "long_break_alert" => paths.long_break_alert = Some(path),
+            "button_click" => paths.button_click = Some(path),
             _ => {}
         }
     }
@@ -164,6 +172,7 @@ impl AudioManager {
             "work_alert" => paths.work_alert = None,
             "short_break_alert" => paths.short_break_alert = None,
             "long_break_alert" => paths.long_break_alert = None,
+            "button_click" => paths.button_click = None,
             _ => {}
         }
     }
@@ -181,6 +190,7 @@ impl AudioManager {
             work_alert: name(&paths.work_alert),
             short_break_alert: name(&paths.short_break_alert),
             long_break_alert: name(&paths.long_break_alert),
+            button_click: name(&paths.button_click),
         }
     }
 }
@@ -193,6 +203,7 @@ impl AudioManager {
 pub const STEM_WORK: &str = "custom_work_alert";
 pub const STEM_SHORT: &str = "custom_short_break_alert";
 pub const STEM_LONG: &str = "custom_long_break_alert";
+pub const STEM_CLICK: &str = "custom_button_click";
 
 /// Scan `audio_dir` for any saved custom audio files and return the paths.
 pub fn find_custom_files(audio_dir: &Path) -> CustomAudioPaths {
@@ -206,6 +217,7 @@ pub fn find_custom_files(audio_dir: &Path) -> CustomAudioPaths {
         work_alert: find(STEM_WORK),
         short_break_alert: find(STEM_SHORT),
         long_break_alert: find(STEM_LONG),
+        button_click: find(STEM_CLICK),
     }
 }
 
@@ -225,12 +237,18 @@ pub fn probe_audio_file(path: &Path) -> Result<(), String> {
 // Audio thread
 // ---------------------------------------------------------------------------
 
+/// How long the output device stays open after a sound ends. Its buffer still
+/// holds the last samples when the player runs dry; closing it at once silenced
+/// short cues like the 75 ms button click completely (measured with WASAPI
+/// loopback). A cue that arrives within this window reuses the open device.
+const DEVICE_HOLD: Duration = Duration::from_millis(500);
+
 fn audio_thread(rx: mpsc::Receiver<PlayRequest>) {
-    // Open the audio device fresh for each request rather than holding a
-    // single stream open indefinitely. This lets the audio thread recover
+    // Open the audio device per burst of sounds rather than holding a single
+    // stream open indefinitely. This lets the audio thread recover
     // automatically after a sleep/wake cycle that resets the OS audio
     // subsystem, avoiding a flood of "buffer underrun/overrun" errors.
-    while let Ok(req) = rx.recv() {
+    while let Ok(first) = rx.recv() {
         let mut device_sink = match DeviceSinkBuilder::open_default_sink() {
             Ok(s) => s,
             Err(e) => {
@@ -240,44 +258,40 @@ fn audio_thread(rx: mpsc::Receiver<PlayRequest>) {
         };
         device_sink.log_on_drop(false);
 
-        let player = Player::connect_new(device_sink.mixer());
-        player.set_volume(req.volume);
-
-        // Try the custom file first; fall back to the embedded asset on any error.
-        let used_custom = if let Some(path) = req.custom_path {
-            match std::fs::File::open(&path).map(std::io::BufReader::new) {
-                Ok(reader) => match Decoder::new(reader) {
-                    Ok(source) => { player.append(source); true }
-                    Err(e) => {
-                        log::warn!("[audio] decode error for {path:?}: {e}");
-                        false
-                    }
-                },
-                Err(e) => {
-                    log::warn!("[audio] cannot open {path:?}: {e}");
-                    false
-                }
-            }
-        } else {
-            false
-        };
-
-        if !used_custom {
-            let bytes: &'static [u8] = match req.cue {
-                AudioCue::WorkAlert => ALERT_WORK,
-                AudioCue::ShortBreakAlert => ALERT_SHORT_BREAK,
-                AudioCue::LongBreakAlert => ALERT_LONG_BREAK,
-                AudioCue::Tick => TICK,
-            };
-            match Decoder::new(Cursor::new(bytes)) {
-                Ok(source) => player.append(source),
-                Err(e) => log::warn!("[audio] embedded decode error: {e}"),
-            }
+        let mut next = Some(first);
+        while let Some(req) = next {
+            let player = Player::connect_new(device_sink.mixer());
+            player.set_volume(req.volume);
+            append_cue(&player, req);
+            // Block until the source is used up, then give the device time to
+            // play out its buffer (see DEVICE_HOLD).
+            player.sleep_until_end();
+            next = rx.recv_timeout(DEVICE_HOLD).ok();
         }
+    }
+}
 
-        // Block until playback completes so device_sink stays alive for the
-        // full duration and drops cleanly afterward.
-        player.sleep_until_end();
+/// Queue the cue's sound: the custom file first, the embedded asset on any error.
+fn append_cue(player: &Player, req: PlayRequest) {
+    if let Some(path) = req.custom_path {
+        match std::fs::File::open(&path).map(std::io::BufReader::new) {
+            Ok(reader) => match Decoder::new(reader) {
+                Ok(source) => return player.append(source),
+                Err(e) => log::warn!("[audio] decode error for {path:?}: {e}"),
+            },
+            Err(e) => log::warn!("[audio] cannot open {path:?}: {e}"),
+        }
+    }
+    let bytes: &'static [u8] = match req.cue {
+        AudioCue::WorkAlert => ALERT_WORK,
+        AudioCue::ShortBreakAlert => ALERT_SHORT_BREAK,
+        AudioCue::LongBreakAlert => ALERT_LONG_BREAK,
+        AudioCue::Tick => TICK,
+        AudioCue::ButtonClick => BUTTON_CLICK,
+    };
+    match Decoder::new(Cursor::new(bytes)) {
+        Ok(source) => player.append(source),
+        Err(e) => log::warn!("[audio] embedded decode error: {e}"),
     }
 }
 
@@ -295,6 +309,8 @@ mod tests {
         assert!(!ALERT_SHORT_BREAK.is_empty());
         assert!(!ALERT_LONG_BREAK.is_empty());
         assert!(!TICK.is_empty());
+        assert!(!BUTTON_CLICK.is_empty());
+        assert!(Decoder::new(Cursor::new(BUTTON_CLICK)).is_ok(), "the click sound must decode");
     }
 
     #[test]

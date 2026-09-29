@@ -24,45 +24,14 @@ pub struct Theme {
 
 /// Raw JSON for every built-in theme, embedded into the binary via include_str!.
 /// The path is relative to this source file (src-tauri/src/themes/mod.rs).
+///
+/// PomoPipen ships only its own themes; the first one (Classic Tomato) is the
+/// fallback the frontend uses when a saved theme name no longer exists.
 const BUNDLED_JSON: &[&str] = &[
-    include_str!("../../../static/themes/andromeda.json"),
-    include_str!("../../../static/themes/ayu.json"),
-    include_str!("../../../static/themes/catppuccin-frappe.json"),
-    include_str!("../../../static/themes/catppuccin-latte.json"),
-    include_str!("../../../static/themes/catppuccin-macchiato.json"),
-    include_str!("../../../static/themes/catppuccin-mocha.json"),
-    include_str!("../../../static/themes/city-lights.json"),
-    include_str!("../../../static/themes/cobalt2.json"),
-    include_str!("../../../static/themes/crimson-white.json"),
-    include_str!("../../../static/themes/dracula.json"),
-    include_str!("../../../static/themes/darcula.json"),
-    include_str!("../../../static/themes/dva.json"),
-    include_str!("../../../static/themes/everforest.json"),
-    include_str!("../../../static/themes/github.json"),
-    include_str!("../../../static/themes/github-dark.json"),
-    include_str!("../../../static/themes/graphite.json"),
-    include_str!("../../../static/themes/gruvbox.json"),
-    include_str!("../../../static/themes/gruvbox-light.json"),
-    include_str!("../../../static/themes/horizon.json"),
-    include_str!("../../../static/themes/kanagawa.json"),
-    include_str!("../../../static/themes/material-palenight.json"),
-    include_str!("../../../static/themes/monokai.json"),
-    include_str!("../../../static/themes/monokai-pro.json"),
-    include_str!("../../../static/themes/night-owl.json"),
-    include_str!("../../../static/themes/nord.json"),
-    include_str!("../../../static/themes/one-dark.json"),
-    include_str!("../../../static/themes/panda.json"),
-    include_str!("../../../static/themes/pomotroid.json"),
-    include_str!("../../../static/themes/pomotroid-light.json"),
-    include_str!("../../../static/themes/popping-and-locking.json"),
-    include_str!("../../../static/themes/rose-pine.json"),
-    include_str!("../../../static/themes/rose-pine-dawn.json"),
-    include_str!("../../../static/themes/rose-pine-moon.json"),
-    include_str!("../../../static/themes/solarized-dark.json"),
-    include_str!("../../../static/themes/solarized-light.json"),
-    include_str!("../../../static/themes/spandex.json"),
-    include_str!("../../../static/themes/synthwave.json"),
-    include_str!("../../../static/themes/tokyo-night.json"),
+    include_str!("../../../static/themes/classic-tomato.json"),
+    include_str!("../../../static/themes/cherry-soda.json"),
+    include_str!("../../../static/themes/citrus-club.json"),
+    include_str!("../../../static/themes/berry-planet.json"),
 ];
 
 /// Parse all bundled theme JSON strings. Panics at startup if any are malformed
@@ -168,7 +137,7 @@ mod tests {
     #[test]
     fn all_bundled_themes_parse() {
         let themes = load_bundled();
-        assert_eq!(themes.len(), 38, "expected 38 bundled themes");
+        assert_eq!(themes.len(), 4, "expected 4 bundled themes");
     }
 
     #[test]
@@ -194,20 +163,12 @@ mod tests {
     }
 
     #[test]
-    fn pomotroid_theme_is_bundled() {
+    fn default_theme_is_bundled_first() {
         let themes = load_bundled();
-        assert!(
-            themes.iter().any(|t| t.name == "Pomotroid"),
-            "Pomotroid theme must be bundled"
-        );
-    }
-
-    #[test]
-    fn crimson_white_theme_is_bundled() {
-        let themes = load_bundled();
-        assert!(
-            themes.iter().any(|t| t.name == "Crimson White"),
-            "Crimson White theme must be bundled"
+        assert_eq!(
+            themes.first().map(|t| t.name.as_str()),
+            Some(crate::settings::Settings::default().theme_light.as_str()),
+            "the default theme must be bundled and listed first"
         );
     }
 }

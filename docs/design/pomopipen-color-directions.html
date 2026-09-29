@@ -1,0 +1,231 @@
+<style>
+  #pomo-directions { width: 100%; max-width: 736px; margin: 0 auto; font-family: "Trebuchet MS", "Microsoft YaHei", system-ui, sans-serif; }
+  #pomo-directions *, #pomo-directions *::before, #pomo-directions *::after { box-sizing: border-box; }
+  #pomo-directions button, #pomo-directions input { font: inherit; }
+  #pomo-directions b, #pomo-directions strong { font-family: inherit; }
+  #pomo-directions button { -webkit-tap-highlight-color: transparent; }
+  #pomo-directions button:focus-visible { outline: 3px solid currentColor; outline-offset: 4px; }
+  #pomo-directions [hidden] { display: none !important; }
+  #pomo-directions .pd-concept { --pd-main: #b80e46; --pd-base: #f9a0b7; --pd-soft: #ffd3dd; --pd-pop: #f7e677; --pd-light: #fff5cc; --pd-ink: #901037; --pd-on: #fff5cc; --pd-alt: #45684a; --pd-alt-bg: #dbe79d; --pd-line: #c63961; --pd-radius: 22px; margin: 0 0 40px; }
+  #pomo-directions .pd-citrus { --pd-main: #2454a1; --pd-base: #f8e6a0; --pd-soft: #b8d8fb; --pd-pop: #ffbe19; --pd-light: #fff4c8; --pd-ink: #164486; --pd-on: #fff2b4; --pd-alt: #08616b; --pd-alt-bg: #bad9ce; --pd-line: #2e5aa7; --pd-radius: 14px; }
+  #pomo-directions .pd-berry { --pd-main: #6650b4; --pd-base: #ff9dd0; --pd-soft: #d4bdff; --pd-pop: #ffee9d; --pd-light: #fff3c2; --pd-ink: #52328f; --pd-on: #fff3bd; --pd-alt: #9e205c; --pd-alt-bg: #ffc1e4; --pd-line: #7958ba; --pd-radius: 30px; }
+  #pomo-directions .pd-label { display: flex; align-items: center; gap: 12px; margin: 0 0 13px; color: light-dark(var(--pd-main), var(--pd-base)); }
+  #pomo-directions .pd-letter { font-family: "Arial Black", sans-serif; font-size: 33px; font-weight: 900; line-height: 1; }
+  #pomo-directions .pd-label h2 { margin: 0; color: inherit; font-size: 20px; font-weight: 800; line-height: 1.35; }
+  #pomo-directions .pd-label p { margin: 3px 0 0; color: inherit; font-size: 12px; line-height: 1.5; }
+  #pomo-directions .pd-swatches { display: flex; margin-left: auto; gap: 4px; }
+  #pomo-directions .pd-swatches span { width: 19px; height: 27px; background: var(--pd-main); border-radius: 6px; }
+  #pomo-directions .pd-swatches span:nth-child(2) { background: var(--pd-base); }
+  #pomo-directions .pd-swatches span:nth-child(3) { background: var(--pd-pop); }
+  #pomo-directions .pd-swatches span:nth-child(4) { background: var(--pd-soft); }
+  #pomo-directions .pd-pair { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; align-items: start; }
+  #pomo-directions .pd-window { color-scheme: light; min-width: 0; color: var(--pd-ink); background: var(--pd-base); border: 2px solid var(--pd-main); border-radius: var(--pd-radius); overflow: hidden; }
+  #pomo-directions .pd-chrome { display: flex; align-items: center; justify-content: space-between; height: 43px; padding: 0 15px; background: var(--pd-main); color: var(--pd-on); }
+  #pomo-directions .pd-brand { display: flex; align-items: center; gap: 7px; font-size: 18px; letter-spacing: -.8px; font-weight: 900; }
+  #pomo-directions .pd-brand svg { width: 21px; height: 21px; }
+  #pomo-directions .pd-chrome-end { font-size: 11px; letter-spacing: 1.3px; font-weight: 700; }
+  #pomo-directions .pd-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin: 16px 16px 0; padding: 4px; border: 1.5px solid var(--pd-main); border-radius: 30px; background: var(--pd-soft); }
+  #pomo-directions .pd-modes button { min-width: 0; padding: 7px 2px; border: 0; border-radius: 24px; background: transparent; color: var(--pd-ink); font-size: 12px; font-weight: 700; line-height: 1.4; }
+  #pomo-directions .pd-modes button[aria-pressed="true"] { background: var(--pd-main); color: var(--pd-on); }
+  #pomo-directions .pd-assignment { display: flex; align-items: center; justify-content: center; gap: 6px; height: 43px; padding: 0 12px; font-size: 12px; font-weight: 700; }
+  #pomo-directions .pd-assignment svg { width: 14px; height: 14px; }
+  #pomo-directions .pd-dial-area { position: relative; display: grid; place-items: center; height: 225px; margin: 0 12px; }
+  #pomo-directions .pd-dial { width: 216px; height: 216px; display: grid; place-items: center; position: relative; border-radius: 50%; background: var(--pd-pop); color: var(--pd-main); }
+  #pomo-directions .pd-ring { width: 216px; height: 216px; position: absolute; inset: 0; transform: rotate(-90deg); }
+  #pomo-directions .pd-ring .pd-track { fill: none; stroke: var(--pd-soft); stroke-width: 10; }
+  #pomo-directions .pd-ring .pd-arc { fill: none; stroke: var(--pd-main); stroke-width: 10; stroke-linecap: round; stroke-dasharray: 604; stroke-dashoffset: 0; }
+  #pomo-directions .pd-dial-copy { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  #pomo-directions .pd-round { color: var(--pd-ink); font-size: 11px; line-height: 1.4; font-weight: 800; letter-spacing: 2px; }
+  #pomo-directions .pd-time { font-family: "Arial Rounded MT Bold", "Arial Black", Arial, sans-serif; font-size: 61px; line-height: 1.15; font-weight: 900; letter-spacing: -3.8px; font-variant-numeric: tabular-nums; }
+  #pomo-directions .pd-state { color: var(--pd-ink); font-size: 12px; line-height: 1.5; font-weight: 700; }
+  #pomo-directions .pd-motif { position: absolute; top: 5px; right: 8px; color: var(--pd-main); transform: rotate(14deg); }
+  #pomo-directions .pd-motif svg { width: 29px; height: 29px; stroke-width: 1.8px; }
+  #pomo-directions .pd-rounds { display: flex; justify-content: center; gap: 7px; height: 25px; align-items: center; }
+  #pomo-directions .pd-rounds span { width: 8px; height: 8px; background: var(--pd-soft); border: 1.4px solid var(--pd-main); border-radius: 50%; }
+  #pomo-directions .pd-rounds span:first-child { background: var(--pd-main); }
+  #pomo-directions .pd-actions { display: flex; gap: 9px; padding: 7px 18px 17px; }
+  #pomo-directions .pd-actions button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 43px; border: 1.5px solid var(--pd-main); border-radius: 26px; background: var(--pd-soft); color: var(--pd-main); }
+  #pomo-directions .pd-actions button.pd-icon-button { width: 43px; flex: 0 0 43px; }
+  #pomo-directions .pd-actions button.pd-start { flex: 1; background: var(--pd-main); color: var(--pd-on); font-size: 14px; font-weight: 800; }
+  #pomo-directions .pd-actions svg { width: 17px; height: 17px; }
+  #pomo-directions .pd-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 13px 18px; background: var(--pd-pop); border-top: 1.5px solid var(--pd-main); font-size: 12px; line-height: 1.4; font-weight: 700; }
+  #pomo-directions .pd-footer b { font-size: 15px; }
+  #pomo-directions .pd-pattern { height: 12px; background: conic-gradient(var(--pd-main) 25%,var(--pd-soft) 0 50%,var(--pd-main) 0 75%,var(--pd-soft) 0) 0 0 / 24px 24px; }
+  #pomo-directions .pd-mini-bar { display: none; }
+  #pomo-directions .pd-citrus .pd-dial { width: 230px; height: 213px; background: var(--pd-main); color: var(--pd-on); border-radius: 115px 115px 22px 22px; }
+  #pomo-directions .pd-citrus .pd-ring { display: none; }
+  #pomo-directions .pd-citrus .pd-dial-copy { padding-top: 16px; gap: 8px; }
+  #pomo-directions .pd-citrus .pd-round, #pomo-directions .pd-citrus .pd-state { color: var(--pd-on); }
+  #pomo-directions .pd-citrus .pd-time { font-size: 66px; letter-spacing: -4px; }
+  #pomo-directions .pd-citrus .pd-mini-bar { display: block; height: 8px; width: 150px; margin-top: 7px; border-radius: 10px; background: linear-gradient(to right,var(--pd-pop) 88%,var(--pd-soft) 88%); }
+  #pomo-directions .pd-citrus .pd-modes, #pomo-directions .pd-citrus .pd-modes button { border-radius: 9px; }
+  #pomo-directions .pd-citrus .pd-actions button { border-radius: 12px; }
+  #pomo-directions .pd-citrus .pd-rounds span { width: 15px; height: 5px; border-radius: 3px; }
+  #pomo-directions .pd-citrus .pd-pattern { background: repeating-linear-gradient(90deg,var(--pd-main) 0 18px,var(--pd-pop) 18px 36px); height: 10px; }
+  #pomo-directions .pd-citrus .pd-footer { background: var(--pd-soft); }
+  #pomo-directions .pd-berry .pd-window { border-width: 3px; }
+  #pomo-directions .pd-berry .pd-dial { border-radius: 44px; transform: rotate(-4deg); background: var(--pd-soft); }
+  #pomo-directions .pd-berry .pd-dial-copy { transform: rotate(4deg); }
+  #pomo-directions .pd-berry .pd-ring .pd-track { stroke: var(--pd-base); }
+  #pomo-directions .pd-berry .pd-ring .pd-arc { stroke-width: 12px; }
+  #pomo-directions .pd-berry .pd-time { color: var(--pd-main); }
+  #pomo-directions .pd-berry .pd-motif { color: var(--pd-alt); top: 1px; right: 1px; }
+  #pomo-directions .pd-berry .pd-footer { background: var(--pd-main); color: var(--pd-on); }
+  #pomo-directions .pd-berry .pd-pattern { height: 10px; background: var(--pd-pop); }
+  #pomo-directions .pd-window.pd-organizer { background: var(--pd-light); }
+  #pomo-directions .pd-tabs { display: flex; gap: 6px; }
+  #pomo-directions .pd-tabs button { border: 0; border-radius: 8px; background: transparent; color: var(--pd-on); padding: 5px 9px; font-size: 12px; font-weight: 700; }
+  #pomo-directions .pd-tabs button[aria-pressed="true"] { color: var(--pd-main); background: var(--pd-on); }
+  #pomo-directions .pd-organizer .pd-chrome-end { font-size: 11px; letter-spacing: .5px; }
+  #pomo-directions .pd-sheet { min-height: 456px; padding: 18px 17px 17px; }
+  #pomo-directions .pd-sheet-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 14px; }
+  #pomo-directions .pd-sheet-heading h3 { margin: 0; color: var(--pd-main); font-size: 24px; font-weight: 900; line-height: 1.25; letter-spacing: -1px; }
+  #pomo-directions .pd-date { font-size: 11px; line-height: 1.5; font-weight: 700; text-align: right; }
+  #pomo-directions .pd-task { border-radius: 15px; border: 1.5px solid var(--pd-main); padding: 12px; margin-bottom: 9px; background: var(--pd-base); color: var(--pd-ink); }
+  #pomo-directions .pd-task.pd-current { background: var(--pd-main); color: var(--pd-on); }
+  #pomo-directions .pd-task.pd-secondary { background: var(--pd-pop); }
+  #pomo-directions .pd-task.pd-third { background: var(--pd-alt-bg); color: var(--pd-alt); border-color: var(--pd-alt); }
+  #pomo-directions .pd-task label { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 800; line-height: 1.55; }
+  #pomo-directions .pd-task input { flex: 0 0 auto; width: 16px; height: 16px; accent-color: var(--pd-main); }
+  #pomo-directions .pd-task input:checked + span { text-decoration: line-through; }
+  #pomo-directions .pd-task-tag { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 11px; font-weight: 700; letter-spacing: .5px; }
+  #pomo-directions .pd-task-meta { margin: 8px 0 0 25px; display: flex; gap: 5px; align-items: center; font-size: 11px; line-height: 1.4; }
+  #pomo-directions .pd-task-meta svg { width: 12px; height: 12px; }
+  #pomo-directions .pd-task-note { display: flex; justify-content: space-between; padding-top: 3px; color: var(--pd-main); font-size: 11px; font-weight: 700; line-height: 1.5; }
+  #pomo-directions .pd-time-total { display: flex; justify-content: space-between; align-items: end; padding: 11px 0 12px; border-top: 1.5px solid var(--pd-line); border-bottom: 1.5px solid var(--pd-line); margin-bottom: 13px; }
+  #pomo-directions .pd-time-total b { font-size: 26px; letter-spacing: -1px; line-height: 1; color: var(--pd-main); }
+  #pomo-directions .pd-time-total span { font-size: 11px; font-weight: 700; }
+  #pomo-directions .pd-heatmap { display: grid; grid-template-columns: repeat(20,minmax(0,1fr)); gap: 3px; margin: 8px 0 16px; }
+  #pomo-directions .pd-heatmap span { aspect-ratio: 1; border-radius: 2px; background: var(--pd-soft); }
+  #pomo-directions .pd-heatmap span:nth-child(5n+1), #pomo-directions .pd-heatmap span:nth-child(7n+2) { background: var(--pd-main); }
+  #pomo-directions .pd-heatmap span:nth-child(3n+3) { background: var(--pd-base); }
+  #pomo-directions .pd-cal-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-weight: 800; }
+  #pomo-directions .pd-cal-title span:last-child { font-size: 11px; }
+  #pomo-directions .pd-cal { display: grid; grid-template-columns: 27px repeat(7,minmax(0,1fr)); gap: 2px; }
+  #pomo-directions .pd-day { display: grid; gap: 1px; align-content: center; min-height: 35px; text-align: center; color: var(--pd-main); font-size: 11px; line-height: 1.2; font-weight: 700; }
+  #pomo-directions .pd-day b { font-size: 14px; line-height: 1.2; }
+  #pomo-directions .pd-day.pd-today { background: var(--pd-main); color: var(--pd-on); border-radius: 9px 9px 0 0; }
+  #pomo-directions .pd-hours { display: flex; flex-direction: column; justify-content: space-between; height: 188px; font-size: 11px; color: var(--pd-ink); padding: 0 0 5px; }
+  #pomo-directions .pd-day-track { position: relative; height: 188px; background: repeating-linear-gradient(to bottom, color-mix(in srgb,var(--pd-main) 19%,transparent) 0 1px,transparent 1px 47px); }
+  #pomo-directions .pd-event { position: absolute; inset: auto 0; padding: 5px 2px; background: var(--pd-main); color: var(--pd-on); border-radius: 5px; font-size: 11px; line-height: 1.3; font-weight: 700; text-align: center; overflow: hidden; }
+  #pomo-directions .pd-event.pd-event-english { background: var(--pd-pop); color: var(--pd-ink); }
+  #pomo-directions .pd-event.pd-event-reading { background: var(--pd-alt-bg); color: var(--pd-alt); }
+  #pomo-directions .pd-event small { display: block; font-size: 11px; font-weight: 400; margin-top: 4px; }
+  #pomo-directions .pd-legend { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; padding-top: 12px; font-size: 11px; font-weight: 700; }
+  #pomo-directions .pd-legend span { display: flex; gap: 4px; align-items: center; }
+  #pomo-directions .pd-legend i { display: inline-block; width: 8px; height: 8px; background: var(--pd-main); border-radius: 3px; }
+  #pomo-directions .pd-legend span:nth-child(2) i { background: var(--pd-pop); }
+  #pomo-directions .pd-legend span:nth-child(3) i { background: var(--pd-alt-bg); }
+  #pomo-directions .pd-citrus .pd-task { border-radius: 10px; }
+  #pomo-directions .pd-berry .pd-task { border-radius: 19px; }
+  #pomo-directions .pd-view-label { margin-top: 9px; font-size: 11px; line-height: 1.5; text-align: center; color: light-dark(var(--pd-main),var(--pd-base)); }
+  #pomo-directions .pd-notice { color: light-dark(#775b77,#d8bddd); font-size: 12px; line-height: 1.5; margin: 0 0 18px; }
+  #pomo-directions .pd-concept[data-mode="short"] .pd-dial { background: var(--pd-alt-bg); color: var(--pd-alt); }
+  #pomo-directions .pd-concept[data-mode="short"] .pd-ring .pd-arc { stroke: var(--pd-alt); }
+  #pomo-directions .pd-concept[data-mode="short"] .pd-time { color: var(--pd-alt); }
+  #pomo-directions .pd-concept[data-mode="short"] .pd-round, #pomo-directions .pd-concept[data-mode="short"] .pd-state { color: var(--pd-alt); }
+  #pomo-directions .pd-concept[data-mode="long"] .pd-dial { background: var(--pd-main); color: var(--pd-on); }
+  #pomo-directions .pd-concept[data-mode="long"] .pd-ring .pd-arc { stroke: var(--pd-pop); }
+  #pomo-directions .pd-concept[data-mode="long"] .pd-ring .pd-track { stroke: var(--pd-main); }
+  #pomo-directions .pd-concept[data-mode="long"] .pd-time { color: var(--pd-on); }
+  #pomo-directions .pd-concept[data-mode="long"] .pd-round, #pomo-directions .pd-concept[data-mode="long"] .pd-state { color: var(--pd-on); }
+  #pomo-directions .pd-no-motif .pd-pattern, #pomo-directions .pd-no-motif .pd-motif { visibility: hidden; }
+  @media(max-width: 610px) {
+    #pomo-directions .pd-pair { grid-template-columns: minmax(0,1fr); gap: 14px; max-width: 360px; margin: auto; }
+    #pomo-directions .pd-label { max-width: 360px; margin-left: auto; margin-right: auto; }
+    #pomo-directions .pd-concept { margin-bottom: 38px; }
+    #pomo-directions .pd-sheet { min-height: 430px; }
+  }
+  @media(prefers-reduced-motion: no-preference) {
+    #pomo-directions .pd-start:hover { transform: translateY(-1px); }
+    #pomo-directions .pd-actions button:active { transform: translateY(1px); }
+  }
+</style>
+<div id="pomo-directions" lang="zh-CN" aria-label="PomoPipen 三套配色与界面设计对比">
+  <p class="pd-notice">交互样稿 · 示例内容 · 可切换专注 / 休息、待办 / 周历</p>
+  <div class="pd-concepts"></div>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('pomo-directions');
+  const concepts = [
+    { id: 'cherry', letter: 'A', name: '樱桃汽水', cue: '红粉棋盘 × Pink lemonade', mark: 'flower-2', main: '#b80e46', radius: 22 },
+    { id: 'citrus', letter: 'B', name: '蓝柠午后', cue: '地中海瓷砖 × 柠檬黄', mark: 'sun', main: '#2454a1', radius: 14 },
+    { id: 'berry', letter: 'C', name: '莓果星球', cue: '星星品牌图 × 紫粉黄', mark: 'sparkles', main: '#6650b4', radius: 30 }
+  ];
+  const modes = { focus: { label: '专注', time: '25:00', task: '数学 / 定积分 · 专题三', caption: '把这件事慢慢做好' }, short: { label: '短休息', time: '05:00', task: '伸个懒腰，喝口水', caption: '休息，也是计划的一部分' }, long: { label: '长休息', time: '15:00', task: '离开屏幕，换换空气', caption: '给自己充一点电' } };
+  const state = { views: {} };
+  const saved = window.openai?.widgetState;
+  const defaults = (id) => ({ mode: 'focus', view: id === 'citrus' ? 'calendar' : 'tasks', running: false, completed: [] });
+  const sanitize = (id, value) => ({ mode: Object.hasOwn(modes,value?.mode) ? value.mode : 'focus', view: value?.view === 'calendar' ? 'calendar' : 'tasks', running: value?.running === true, completed: Array.isArray(value?.completed) ? value.completed.filter(x => Number.isInteger(x) && x >= 0 && x < 3) : [] });
+  concepts.forEach(c => { state.views[c.id] = saved?.privateContent?.views?.[c.id] ? sanitize(c.id, saved.privateContent.views[c.id]) : defaults(c.id); });
+  const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
+  const calendar = () => {
+    const days = ['日','一','二','三','四','五','六'];
+    const events = [[0,0,56,'math','数学','积分'],[1,63,46,'english','英语','阅读'],[2,23,66,'reading','专业','笔记'],[3,0,78,'math','数学','积分'],[3,104,48,'english','英语','长句'],[4,40,54,'reading','专业','复盘'],[5,68,77,'math','数学','真题'],[6,21,65,'english','英语','阅读']];
+    return `<div class="pd-sheet-heading"><h3>学习记录</h3><div class="pd-date">9 月 23 日<br>星期三</div></div><div class="pd-time-total"><span>本周专注</span><b>12 h 35 m</b></div><div class="pd-heatmap" aria-label="最近六十天的专注热力图示例">${'<span></span>'.repeat(60)}</div><div class="pd-cal-title"><span>这一周</span><span>09.20 — 09.26</span></div><div class="pd-cal"><span></span>${days.map((d,i)=>`<div class="pd-day ${i===3?'pd-today':''}"><span>${d}</span><b>${20+i}</b></div>`).join('')}<div class="pd-hours"><span>09</span><span>10</span><span>11</span><span>12</span><span>13</span></div>${days.map((d,i)=>`<div class="pd-day-track">${events.filter(e=>e[0]===i).map(e=>`<div class="pd-event pd-event-${e[3]}" style="top:${e[1]}px;height:${e[2]}px" aria-label="星期${d}，${e[4]}，${e[5]}">${e[4]}<small>${e[5]}</small></div>`).join('')}</div>`).join('')}</div><div class="pd-legend"><span><i></i>数学</span><span><i></i>英语</span><span><i></i>专业课</span></div>`;
+  };
+  const tasks = () => `<div class="pd-sheet-heading"><h3>今日任务</h3><div class="pd-date">9 月 23 日<br>星期三</div></div><div class="pd-task pd-current"><div class="pd-task-tag"><span>01 / 数学</span><span>正在准备</span></div><label class="cursor-interaction"><input type="checkbox" data-task="0"><span>定积分 · 专题三</span></label><div class="pd-task-meta">${icon('timer')}<span>预计 2 个番茄钟 · 已专注 25 分钟</span></div></div><div class="pd-task pd-secondary"><div class="pd-task-tag"><span>02 / 英语</span><span>50 min</span></div><label class="cursor-interaction"><input type="checkbox" data-task="1"><span>阅读精练与长难句整理</span></label><div class="pd-task-meta">${icon('book-open')}<span>把今天的 5 个长句理清楚</span></div></div><div class="pd-task pd-third"><div class="pd-task-tag"><span>03 / 专业课</span><span>25 min</span></div><label class="cursor-interaction"><input type="checkbox" data-task="2"><span>复习第二章笔记</span></label><div class="pd-task-meta">${icon('notebook-pen')}<span>回顾重点，再做一道例题</span></div></div><div class="pd-task-note"><span data-completed>0 / 3 项已完成</span><span>每一小步都算数</span></div>`;
+  root.querySelector('.pd-concepts').innerHTML = concepts.map(c => `<section class="pd-concept pd-${c.id}" data-concept="${c.id}" data-mode="focus" aria-label="${c.letter} ${c.name}"><header class="pd-label"><span class="pd-letter">${c.letter}</span><div><h2>${c.name}</h2><p>${c.cue}</p></div><div class="pd-swatches" aria-label="本方案主色、底色、强调色与辅助色"><span></span><span></span><span></span><span></span></div></header><div class="pd-pair"><div><div class="pd-window pd-timer" aria-label="${c.name} 计时器"><header class="pd-chrome"><span class="pd-brand">${icon(c.mark)}pomopipen</span><span class="pd-chrome-end">FOCUS CLUB</span></header><div class="pd-modes" aria-label="计时模式"><button class="cursor-interaction" type="button" data-mode="focus" aria-pressed="true">专注</button><button class="cursor-interaction" type="button" data-mode="short" aria-pressed="false">短休息</button><button class="cursor-interaction" type="button" data-mode="long" aria-pressed="false">长休息</button></div><div class="pd-assignment">${icon('bookmark')}<span data-task-label>数学 / 定积分 · 专题三</span></div><div class="pd-dial-area"><div class="pd-dial"><svg class="pd-ring" viewBox="0 0 216 216" aria-hidden="true"><circle class="pd-track" cx="108" cy="108" r="96"></circle><circle class="pd-arc" cx="108" cy="108" r="96"></circle></svg><div class="pd-dial-copy"><span class="pd-round">ROUND 01 / 04</span><div class="pd-time">25:00</div><span class="pd-state">把这件事慢慢做好</span><span class="pd-mini-bar" aria-hidden="true"></span></div></div><span class="pd-motif">${icon(c.mark)}</span></div><div class="pd-rounds" aria-label="第一个番茄钟，共四轮"><span></span><span></span><span></span><span></span></div><div class="pd-actions"><button class="pd-icon-button cursor-interaction" type="button" data-reset aria-label="重置预览计时">${icon('rotate-ccw')}</button><button class="pd-start cursor-interaction" type="button" data-start>${icon('play')}<span>开始专注</span></button><button class="pd-icon-button cursor-interaction" type="button" data-next aria-label="预览下一轮">${icon('skip-forward')}</button></div><footer class="pd-footer"><span>今日专注 <b>2 h 15 m</b></span><span>5 个番茄钟</span></footer><div class="pd-pattern" aria-hidden="true"></div></div><div class="pd-view-label">计时器 · 模式与按钮状态可试用</div></div><div><div class="pd-window pd-organizer" aria-label="${c.name} 学习面板"><header class="pd-chrome"><div class="pd-tabs" aria-label="学习面板视图"><button class="cursor-interaction" type="button" data-view="tasks" aria-pressed="true">待办</button><button class="cursor-interaction" type="button" data-view="calendar" aria-pressed="false">周历</button></div><span class="pd-chrome-end">POMO / STUDY</span></header><div class="pd-sheet" data-panel="tasks">${tasks()}</div><div class="pd-sheet" data-panel="calendar" hidden>${calendar()}</div><div class="pd-pattern" aria-hidden="true"></div></div><div class="pd-view-label">任务与统计 · 配色延伸到所有页面</div></div></div></section>`).join('');
+  function save() {
+    const api = window.openai;
+    if (typeof api?.setWidgetState === 'function') api.setWidgetState({ modelContent: { preview: 'PomoPipen 新视觉方向', designs: concepts.map(c=>({ name:c.name, mode:state.views[c.id].mode, view:state.views[c.id].view })) }, privateContent: { views: state.views } }).catch(()=>{});
+  }
+  function update(id) {
+    const section = root.querySelector(`[data-concept="${id}"]`);
+    const v = state.views[id], m = modes[v.mode];
+    section.dataset.mode = v.mode;
+    section.querySelectorAll('.pd-modes button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===v.mode)));
+    section.querySelectorAll('.pd-tabs button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===v.view)));
+    section.querySelectorAll('[data-panel]').forEach(p=>{p.hidden=p.dataset.panel!==v.view;});
+    section.querySelector('.pd-time').textContent = v.running ? (v.mode==='focus'?'24:59':v.mode==='short'?'04:59':'14:59') : m.time;
+    section.querySelector('[data-task-label]').textContent = m.task;
+    section.querySelector('.pd-state').textContent = v.running ? `${m.label}中 · 演示状态` : m.caption;
+    section.querySelector('.pd-state').setAttribute('aria-live','polite');
+    section.querySelector('.pd-ring .pd-arc').style.strokeDashoffset = v.running ? '2' : '0';
+    section.querySelector('[data-start] span').textContent = v.running ? '暂停' : `开始${m.label}`;
+    section.querySelector('[data-start]').setAttribute('aria-pressed',String(v.running));
+    const old = section.querySelector('[data-start] svg, [data-start] i');
+    if (old) old.outerHTML = icon(v.running?'pause':'play');
+    section.querySelectorAll('[data-task]').forEach(input=>{input.checked=v.completed.includes(Number(input.dataset.task));});
+    section.querySelector('[data-completed]').textContent = `${v.completed.length} / 3 项已完成`;
+    if (globalThis.lucide) lucide.createIcons({ attrs: { width:16,height:16 } });
+  }
+  concepts.forEach(c=>{
+    update(c.id);
+    const section=root.querySelector(`[data-concept="${c.id}"]`);
+    section.addEventListener('click',event=>{
+      const button=event.target.closest('button'); if(!button)return;
+      const v=state.views[c.id];
+      if(button.dataset.mode){v.mode=button.dataset.mode;v.running=false;}
+      if(button.dataset.view)v.view=button.dataset.view;
+      if(button.hasAttribute('data-start'))v.running=!v.running;
+      if(button.hasAttribute('data-reset'))v.running=false;
+      if(button.hasAttribute('data-next')){const keys=['focus','short','long'];v.mode=keys[(keys.indexOf(v.mode)+1)%keys.length];v.running=false;}
+      update(c.id);save();
+    });
+    section.addEventListener('change',event=>{
+      const input=event.target.closest('[data-task]');if(!input)return;
+      const v=state.views[c.id],n=Number(input.dataset.task);
+      v.completed=input.checked?[...new Set([...v.completed,n])]:v.completed.filter(x=>x!==n);
+      update(c.id);save();
+    });
+    if(globalThis.Tweak){
+      const design={ main:c.main, radius:c.radius, motifs:true };
+      const tweak=new Tweak({container:section,onChange:()=>{
+        section.style.setProperty('--pd-main',design.main);
+        section.style.setProperty('--pd-radius',`${design.radius}px`);
+        section.classList.toggle('pd-no-motif',!design.motifs);
+      }});
+      tweak.addColorPicker(design,'main',{label:'主色 / 轮廓 / 数字',reference:'--pd-main'});
+      tweak.addSlider(design,'radius',{label:'窗口圆角',min:8,max:36,step:2,unit:'px'});
+      tweak.addToggle(design,'motifs',{label:'装饰纹样'});
+    }
+  });
+  window.addEventListener('openai:set_globals',event=>{
+    const incoming=event.detail?.globals?.widgetState?.privateContent?.views;
+    if(!incoming)return;
+    concepts.forEach(c=>{if(incoming[c.id]){state.views[c.id]=sanitize(c.id,incoming[c.id]);update(c.id);}});
+  });
+})();
+</script>

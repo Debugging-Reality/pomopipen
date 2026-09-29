@@ -4,10 +4,12 @@
 ///   - toggle: Ctrl+F1 (start/pause/resume)
 ///   - reset:  Ctrl+F2
 ///   - skip:   Ctrl+F3
+///   - jot:    Ctrl+Alt+N (brings the timer forward with the jot pad open)
 ///
 /// All shortcuts are unregistered before re-registering, so calling
 /// `register_all` is idempotent.
-use tauri::{AppHandle, Manager};
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use crate::settings::Settings;
@@ -103,6 +105,7 @@ pub fn register_all(app: &AppHandle, settings: &Settings) {
         (settings.shortcut_reset.as_str(),   ShortcutAction::Reset),
         (settings.shortcut_skip.as_str(),    ShortcutAction::Skip),
         (settings.shortcut_restart.as_str(), ShortcutAction::RestartRound),
+        (settings.shortcut_jot.as_str(),     ShortcutAction::Jot),
     ];
 
     for (key_str, action) in shortcuts {
@@ -142,6 +145,7 @@ enum ShortcutAction {
     Reset,
     Skip,
     RestartRound,
+    Jot,
 }
 
 impl ShortcutAction {
@@ -151,19 +155,50 @@ impl ShortcutAction {
             Self::Reset        => "reset",
             Self::Skip         => "skip",
             Self::RestartRound => "restart-round",
+            Self::Jot          => "jot",
         }
     }
 }
 
 fn fire_action(app: &AppHandle, action: ShortcutAction) {
     log::info!("[shortcut] fired: {}", action.as_str());
+    if let ShortcutAction::Jot = action {
+        open_jot_pad(app);
+        return;
+    }
     let Some(timer) = app.try_state::<TimerController>() else { return };
     match action {
         ShortcutAction::Toggle       => timer.toggle(),
         ShortcutAction::Reset        => timer.reset(),
         ShortcutAction::Skip         => timer.skip(),
         ShortcutAction::RestartRound => timer.restart_round(),
+        ShortcutAction::Jot          => {}
     }
+}
+
+/// Payload of `jots:capture`: how to put the timer window back once the jot
+/// is written — "hide" (it was in the tray), "minimize", or "" (leave it).
+#[derive(Clone, Serialize)]
+pub struct JotCapture {
+    pub restore: &'static str,
+}
+
+/// Bring the timer window forward and ask it to open the jot pad. Remembers
+/// whether the window was hidden or minimised so the pad can send it back
+/// after a quick jot and the user lands where they were.
+fn open_jot_pad(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else { return };
+    let restore = if !window.is_visible().unwrap_or(true) {
+        "hide"
+    } else if window.is_minimized().unwrap_or(false) {
+        "minimize"
+    } else {
+        ""
+    };
+    let _ = window.show();
+    let _ = window.unminimize();
+    let _ = window.set_focus();
+    let _ = app.emit_to("main", "jots:capture", JotCapture { restore });
 }
 
 // ---------------------------------------------------------------------------

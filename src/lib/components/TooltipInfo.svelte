@@ -40,16 +40,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-foreground);
+    color: var(--ui-text-muted);
     cursor: default;
-    margin-left: 5px;
-    opacity: 0.55;
-    transition: opacity 0.15s;
+    margin-left: 6px;
+    transition: color 0.15s;
     user-select: none;
     flex-shrink: 0;
   }
 
   .info-icon:hover {
-    opacity: 1;
+    color: var(--ui-brand);
   }
 </style>

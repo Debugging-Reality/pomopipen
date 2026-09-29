@@ -27,6 +27,15 @@ fn main() {
         None => format!("{base_version}+unknown"),
     };
 
+    // Google Calendar sync: a Desktop-app OAuth client dropped at
+    // google/client.json (git-ignored) ships inside the build, so the app can
+    // sign in without importing a client first. See google/README.md.
+    println!("cargo:rerun-if-changed=google");
+    if let Ok(client) = std::fs::read_to_string("google/client.json") {
+        let one_line: String = client.lines().map(str::trim).collect();
+        println!("cargo:rustc-env=POMOPIPEN_GOOGLE_CLIENT={one_line}");
+    }
+
     println!("cargo:rustc-env=APP_BUILD_VERSION={build_version}");
     println!("cargo:rustc-env=APP_BUILD_SHA={full_sha}");
 

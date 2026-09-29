@@ -1,15 +1,32 @@
 <script lang="ts">
   // Captures a keyboard combination and formats it as a shortcut string
   // matching Rust's parse_shortcut format (e.g. "Control+F1", "Shift+Alt+A").
+  // Shown as keycaps; click (or Enter/Space) to record, Esc or clicking away cancels.
+
+  import { settings } from '$lib/stores/settings';
+  import { getLocale } from '$paraglide/runtime.js';
 
   interface Props {
     value?: string;
+    label?: string;
     onchange?: (value: string) => void;
   }
 
-  let { value = '', onchange }: Props = $props();
+  let { value = '', label = '', onchange }: Props = $props();
 
   let listening = $state(false);
+  let zh = $derived.by(() => { void $settings.language; return getLocale().startsWith('zh'); });
+  let parts = $derived(value ? value.split('+').map(display) : []);
+
+  function display(part: string): string {
+    if (part === 'Control') return 'Ctrl';
+    if (part === 'Super') return 'Win';
+    if (part === 'Left') return '←';
+    if (part === 'Right') return '→';
+    if (part === 'Up') return '↑';
+    if (part === 'Down') return '↓';
+    return part;
+  }
 
   function codeToKey(code: string): string | null {
     if (code.startsWith('Key')) return code.slice(3); // "KeyA" → "A"
@@ -17,7 +34,6 @@
     if (/^F([1-9]|1[0-2])$/.test(code)) return code; // "F1"–"F12"
     if (code === 'Space') return 'Space';
     if (code === 'Enter') return 'Enter';
-    if (code === 'Escape') return 'Escape';
     if (code === 'ArrowLeft') return 'Left';
     if (code === 'ArrowRight') return 'Right';
     if (code === 'ArrowUp') return 'Up';
@@ -26,76 +42,111 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if (!listening) return;
+    if (!listening) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        listening = true;
+      }
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
 
+    if (e.key === 'Escape') {
+      listening = false;
+      return;
+    }
     // Ignore bare modifier keys
     if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
 
     const key = codeToKey(e.code);
     if (!key) return;
 
-    const parts: string[] = [];
-    if (e.ctrlKey) parts.push('Control');
-    if (e.shiftKey) parts.push('Shift');
-    if (e.altKey) parts.push('Alt');
-    if (e.metaKey) parts.push('Super');
-    parts.push(key);
+    const combo: string[] = [];
+    if (e.ctrlKey) combo.push('Control');
+    if (e.shiftKey) combo.push('Shift');
+    if (e.altKey) combo.push('Alt');
+    if (e.metaKey) combo.push('Super');
+    combo.push(key);
 
-    const shortcut = parts.join('+');
-    onchange?.(shortcut);
     listening = false;
-  }
-
-  function onFocus() {
-    listening = true;
-  }
-
-  function onBlur() {
-    listening = false;
+    onchange?.(combo.join('+'));
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<input
-  class="shortcut-input"
+<button
+  class="key-field"
   class:listening
-  readonly
-  {value}
-  placeholder="Click and press keys…"
-  onfocus={onFocus}
-  onblur={onBlur}
+  onclick={() => (listening = !listening)}
+  onblur={() => (listening = false)}
   onkeydown={onKeydown}
-  role="textbox"
-  tabindex="0"
-/>
+  aria-label={`${label} ${parts.join(' + ')}`}
+  title={zh ? '点击后按下新的组合键' : 'Click, then press a new key combination'}
+>
+  {#if listening}
+    <span class="prompt">{zh ? '请按下组合键 · Esc 取消' : 'Press keys · Esc cancels'}</span>
+  {:else if parts.length}
+    {#each parts as part, i}
+      {#if i > 0}<span class="plus">+</span>{/if}
+      <kbd class="s-kbd">{part}</kbd>
+    {/each}
+  {:else}
+    <span class="prompt">{zh ? '未设置' : 'Not set'}</span>
+  {/if}
+</button>
 
 <style>
-  .shortcut-input {
-    background: var(--color-background);
-    border: 1px solid transparent;
-    border-radius: 4px;
-    color: var(--color-foreground);
+  .key-field {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    min-width: 168px;
+    height: 36px;
+    padding: 0 6px;
+    border-radius: 10px;
+    border: 1px dashed transparent;
+    background: none;
+    font: inherit;
     cursor: pointer;
-    font-size: 0.75rem;
-    font-family: 'Mona Sans Mono', monospace;
-    padding: 4px 8px;
-    text-align: center;
-    outline: none;
-    width: 140px;
-    transition: border-color 0.15s;
+    transition:
+      background 150ms ease,
+      border-color 150ms ease;
   }
 
-  .shortcut-input.listening {
-    border-color: var(--color-accent);
-    cursor: text;
+  .key-field:hover {
+    background: var(--ui-hover);
+    border-color: var(--ui-border-strong);
   }
 
-  .shortcut-input::placeholder {
-    color: var(--color-foreground-darker, var(--color-foreground));
-    opacity: 0.5;
-    font-family: system-ui, sans-serif;
-    font-size: 0.7rem;
+  .key-field.listening {
+    justify-content: center;
+    border-style: solid;
+    border-color: var(--ui-brand);
+    background: var(--ui-surface);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 20%, transparent);
+  }
+
+  .plus {
+    font-size: 12px;
+    color: var(--ui-text-muted);
+  }
+
+  .prompt {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ui-text-muted);
+  }
+
+  .listening .prompt {
+    color: var(--ui-brand-strong);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.55;
+    }
   }
 </style>

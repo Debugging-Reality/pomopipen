@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Pomotroid",
+  "productName": "PomoPipen",
   "version": "1.7.1",
-  "identifier": "com.splode.pomotroid",
+  "identifier": "com.journ.pomopipen.dev",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Pomotroid",
+        "title": "PomoPipen",
         "width": 360,
         "height": 478,
         "minWidth": 240,
@@ -26,15 +26,17 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self'"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self'; img-src 'self' blob: asset: http://asset.localhost",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/backgrounds/**/*", "$APPDATA/icon/**/*"]
+      }
     }
   },
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDMTE5MDhGMEMyMDNDNjYKUldSbVBDQU1qNUFSZkc4SXhsOGx6Q1d6UkNPbHlBTUU3Qzhlb0cwa2pZZjk0S1RxNVUweS9YNlQK",
-      "endpoints": [
-        "https://raw.githubusercontent.com/Splode/pomotroid/main/latest.json"
-      ]
+      "endpoints": []
     }
   },
   "bundle": {
@@ -50,9 +52,9 @@
       "icons/icon.ico"
     ],
     "category": "Utility",
-    "copyright": "Copyright © 2017–2026 Christopher Murphy (Splode). MIT License.",
-    "shortDescription": "A beautiful Pomodoro timer",
-    "longDescription": "Pomotroid is a simple, configurable and visually pleasing Pomodoro timer. Keep track of your work sessions and take breaks with a clean, themeable interface.",
+    "copyright": "Copyright © 2017–2026 Christopher Murphy (Splode). MIT License. PomoPipen is a personal fork.",
+    "shortDescription": "A study-focused Pomodoro timer",
+    "longDescription": "PomoPipen is a personal fork of Pomotroid, adding per-subject study tracking, a task list, and Google Calendar sync.",
     "linux": {
       "deb": {
         "depends": []

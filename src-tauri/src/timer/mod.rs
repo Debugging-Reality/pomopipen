@@ -241,6 +241,9 @@ fn listen_events(
     let mut last_tray_progress: f32 = -1.0;
     // Active session row ID for recording (None = not started yet).
     let mut current_session_id: Option<i64> = None;
+    // Whether that session is a focus round. Kept apart because a full reset
+    // rewinds the sequence before its Reset event arrives here.
+    let mut current_session_is_work = false;
 
     while let Ok(event) = event_rx.recv() {
         match event {
@@ -268,16 +271,31 @@ fn listen_events(
                 // --- Session recording: start on first tick of a new round ---
                 if elapsed_secs == 1 && current_session_id.is_none() {
                     let rt = sequence.lock().unwrap().current_round.as_str().to_string();
-                    let total = {
+                    let (total, subject_id, task_id) = {
                         let seq = sequence.lock().unwrap();
                         let s = settings.lock().unwrap();
-                        seq.current_duration_secs(&s)
+                        // Breaks are never attributed to a subject or task.
+                        let is_work = rt == "work";
+                        let subject = if is_work { s.active_subject_id } else { None };
+                        let task = if is_work { s.active_task_id } else { None };
+                        (seq.current_duration_secs(&s), subject, task)
                     };
                     if let Ok(conn) = db.lock() {
-                        match queries::insert_session(&conn, &rt, total) {
-                            Ok(id) => current_session_id = Some(id),
+                        match queries::insert_session(&conn, &rt, total, subject_id, task_id) {
+                            Ok(id) => {
+                                current_session_id = Some(id);
+                                current_session_is_work = rt == "work";
+                            }
                             Err(e) => log::error!("[timer] failed to record session: {e}"),
                         }
+                    }
+                }
+
+                // Checkpoint once a minute, so quitting mid-round still counts
+                // the focus so far (closed on the next launch).
+                if elapsed_secs % 60 == 0 {
+                    if let (Some(id), Ok(conn)) = (current_session_id, db.lock()) {
+                        let _ = queries::save_session_progress(&conn, id, elapsed_secs);
                     }
                 }
 
@@ -308,10 +326,17 @@ fn listen_events(
                 );
 
                 // --- Session recording: mark the completed round ---
+                // A skipped round still counts the focus it had so far.
                 if let Some(session_id) = current_session_id.take() {
+                    let elapsed = shared.lock().unwrap().elapsed_secs;
                     if let Ok(conn) = db.lock() {
-                        let _ = queries::complete_session(&conn, session_id, !was_skipped);
+                        let _ = queries::complete_session(&conn, session_id, !was_skipped, elapsed);
                     }
+                    // Fork: focus goes to Google Calendar shortly after.
+                    if completed_round == "work" && (!was_skipped || elapsed >= queries::MIN_FOCUS_SECS) {
+                        crate::gcal::schedule_sync(&app);
+                    }
+                    let _ = app.emit("sessions:changed", ());
                 }
 
                 // Advance sequence.
@@ -441,8 +466,18 @@ fn listen_events(
 
             TimerEvent::Reset => {
                 log::debug!("[timer] idle");
-                // Abandon the active session (leave DB row as-is).
-                current_session_id = None;
+                // Close the round in progress, counting the focus it had so far
+                // (the user reset or restarted it part way).
+                if let Some(session_id) = current_session_id.take() {
+                    let elapsed = shared.lock().unwrap().elapsed_secs;
+                    if let Ok(conn) = db.lock() {
+                        let _ = queries::complete_session(&conn, session_id, false, elapsed);
+                    }
+                    if current_session_is_work && elapsed >= queries::MIN_FOCUS_SECS {
+                        crate::gcal::schedule_sync(&app);
+                    }
+                    let _ = app.emit("sessions:changed", ());
+                }
 
                 {
                     let mut s = shared.lock().unwrap();

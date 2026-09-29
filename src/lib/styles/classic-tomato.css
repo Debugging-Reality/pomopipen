@@ -1,0 +1,278 @@
+/* Classic Tomato: a warm printed produce label (docs/design/classic-tomato).
+   Loaded globally from app.css; every rule is scoped to the theme so the other
+   themes are untouched. Flat inks, 1–1.5 px rules, 3–6 px radii, one decorative
+   motif per screen; realism is reserved for the tomato objects themselves. */
+
+html[data-pomo-theme='classic-tomato'] {
+  --font-classic-display: 'Classic Serif SC', 'Source Han Serif Display', 'Noto Serif SC', 'Songti SC', serif;
+  --font-display: 'Source Serif Display', 'Classic Serif SC', 'Noto Serif SC', Georgia, serif;
+  --color-separator: rgb(32 38 32 / 16%);
+  --color-hover: rgb(32 38 32 / 7%);
+  /* Very quiet paper grain, large backgrounds only. */
+  --classic-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .36 0 0 0 0 .28 0 0 0 0 .16 0 0 0 .55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.075'/></svg>");
+}
+
+html[data-pomo-theme='classic-tomato'] body {
+  background-image: var(--classic-grain);
+}
+
+/* ── Title bars: paper, ink icons — not a red band ─────────────────────── */
+html[data-pomo-theme='classic-tomato'] :is(.window, .app) .titlebar {
+  background: transparent;
+  border-bottom: 1px solid transparent;
+}
+
+html[data-pomo-theme='classic-tomato'] .window .titlebar {
+  border-bottom-color: rgb(32 38 32 / 14%);
+}
+
+html[data-pomo-theme='classic-tomato'] :is(.window, .app) .titlebar :is(.titlebar-label, .btn-close, .btn-icon, .btn-max, .zoom button) {
+  color: var(--color-foreground-darker);
+  font-family: var(--font-ui);
+  font-weight: 650;
+}
+
+html[data-pomo-theme='classic-tomato'] :is(.window, .app) .titlebar :is(.btn-icon, .btn-max, .zoom button):hover {
+  color: var(--color-foreground);
+  background: var(--pomo-soft);
+}
+
+html[data-pomo-theme='classic-tomato'] :is(.window, .app) :is(button, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--pomo-alt);
+  outline-offset: 2px;
+}
+
+/* The compact timer fills the whole 240 × 200 content area. */
+html[data-pomo-theme='classic-tomato'] main.compact {
+  padding-bottom: 0;
+}
+
+/* ── Settings, tasks, stats: a tidy printed record sheet ───────────────── */
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-page-head h2 {
+  font-family: var(--font-classic-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-group-title {
+  font-family: var(--font-classic-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ui-text);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-group-title::before {
+  display: none;
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-card {
+  border: 0;
+  border-top: 1.5px solid var(--ui-text);
+  border-bottom: 1px solid var(--ui-border-strong);
+  border-radius: 0;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--ui-surface) 55%, transparent);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-card > :first-child,
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-card > :last-child {
+  border-radius: 0;
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui :is(.s-btn, .s-input, .s-value, .s-kbd) {
+  border-radius: 4px;
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-btn {
+  border-width: 1.5px;
+  border-color: var(--ui-text);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-btn--ghost {
+  border-color: transparent;
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-btn--primary {
+  border-color: var(--ui-text);
+  box-shadow: 2px 2px 0 var(--ui-text);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-btn--primary:active:not(:disabled) {
+  box-shadow: none;
+  transform: translate(2px, 2px);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-input {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--ui-text) 55%, transparent);
+  background: var(--ui-surface);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-input:focus {
+  border-color: var(--ui-text);
+  box-shadow: none;
+  outline: 2px solid var(--pomo-alt);
+  outline-offset: 2px;
+}
+
+/* Switches: rectangular, and "on" is leaf green with the knob on the right. */
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-switch {
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1.5px var(--ui-text);
+  background: var(--pomo-soft);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-switch::after {
+  border-radius: 3px;
+  box-shadow: 0 0 0 1.5px var(--ui-text);
+  background: var(--ui-surface);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-switch.on {
+  background: var(--color-short-round);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-segment {
+  padding: 0;
+  gap: 0;
+  border: 1.5px solid var(--ui-text);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-segment button {
+  border-radius: 0;
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-segment button + button {
+  border-left: 1px solid rgb(32 38 32 / 30%);
+}
+
+html[data-pomo-theme='classic-tomato'] .pomo-ui .s-segment button.on {
+  background: var(--ui-text);
+  color: var(--ui-surface);
+  box-shadow: none;
+}
+
+/* ── Week calendar chrome (the blocks themselves are tomatoes, see WeekCalendarGrid) ── */
+html[data-pomo-theme='classic-tomato'] .week-calendar h2 {
+  font-family: var(--font-classic-display);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+html[data-pomo-theme='classic-tomato'] .week-calendar .total {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ui-text);
+  font-family: 'Source Serif Display', Georgia, serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+html[data-pomo-theme='classic-tomato'] .week-calendar button {
+  border: 1.5px solid color-mix(in srgb, var(--ui-text) 55%, transparent);
+  border-radius: 4px;
+}
+
+html[data-pomo-theme='classic-tomato'] .week-calendar button.active {
+  background: var(--ui-text);
+  border-color: var(--ui-text);
+  color: var(--ui-surface);
+}
+
+html[data-pomo-theme='classic-tomato'] .calendar-surface {
+  border: 0;
+  border-top: 1.5px solid var(--ui-text);
+  border-bottom: 1px solid var(--ui-border-strong);
+  border-radius: 0;
+}
+
+html[data-pomo-theme='classic-tomato'] .calendar-surface .day-header {
+  border-bottom: 1px solid rgb(32 38 32 / 22%);
+}
+
+html[data-pomo-theme='classic-tomato'] .calendar-surface .day b {
+  font-family: 'Source Serif Display', Georgia, serif;
+  font-weight: 700;
+  font-variant-numeric: lining-nums;
+}
+
+html[data-pomo-theme='classic-tomato'] .calendar-surface .day.today b {
+  width: auto;
+  min-width: 28px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--ui-text);
+  color: var(--ui-surface);
+}
+
+html[data-pomo-theme='classic-tomato'] .calendar-surface .today-column {
+  background-color: color-mix(in srgb, var(--pomo-soft) 35%, transparent);
+}
+
+/* Settings / tasks / stats title bars sit on paper here, so their brand-colored
+   label and buttons switch to ink. */
+html[data-pomo-theme='classic-tomato'] .window .titlebar .title {
+  color: var(--ui-text);
+  font-family: var(--font-classic-display);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+html[data-pomo-theme='classic-tomato'] .window .titlebar .title .spark {
+  color: var(--ui-brand);
+}
+
+html[data-pomo-theme='classic-tomato'] .window .titlebar .btn-close {
+  color: var(--color-foreground-darker);
+}
+
+html[data-pomo-theme='classic-tomato'] .window .titlebar .btn-close:hover {
+  color: var(--ui-text);
+  background: var(--pomo-soft);
+}
+
+html[data-pomo-theme='classic-tomato'] .window .titlebar .btn-close:focus-visible {
+  outline-color: var(--pomo-alt);
+}
+
+/* Keyboard focus is navy here (the shared UI rule would draw it tomato red). */
+html[data-pomo-theme='classic-tomato'] .pomo-ui.window :is(button, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--pomo-alt);
+  outline-offset: 2px;
+}
+
+/* ── Print tomatoes tiled across the page backgrounds ─────────────────────
+   Chosen in Settings → Appearance: tomatoes on the vine (default), a variety
+   chart, or plain paper. A paper veil keeps cards, charts and text on quiet ground. */
+html[data-pomo-theme='classic-tomato'] {
+  --classic-pattern: url('/classic-tomato/art/vine.svg');
+  --classic-pattern-size: 600px;
+  --classic-veil: color-mix(in srgb, var(--ui-page) 70%, transparent);
+}
+
+html[data-pomo-theme='classic-tomato'][data-classic-pattern='varieties'] {
+  --classic-pattern: url('/classic-tomato/art/varieties.svg');
+  --classic-pattern-size: 520px;
+}
+
+html[data-pomo-theme='classic-tomato'][data-classic-pattern='none'] {
+  --classic-pattern: none;
+}
+
+html[data-pomo-theme='classic-tomato'] .window .content:not(.calendar-tab) {
+  background:
+    linear-gradient(var(--classic-veil), var(--classic-veil)),
+    var(--classic-pattern) 0 0 / var(--classic-pattern-size) auto repeat local,
+    var(--ui-page);
+}
+
+html[data-pomo-theme='classic-tomato'] .window .sidebar {
+  background:
+    linear-gradient(color-mix(in srgb, var(--ui-sidebar) 84%, transparent), color-mix(in srgb, var(--ui-sidebar) 84%, transparent)),
+    var(--classic-pattern) 40px 60px / var(--classic-pattern-size) auto repeat,
+    var(--ui-sidebar);
+}

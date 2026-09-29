@@ -1,78 +1,111 @@
 <script lang="ts">
-  // Records a single key (no modifiers) as a KeyboardEvent.key string.
+  // Records a single key (no modifiers) as a KeyboardEvent.key string, shown as
+  // a keycap. Click (or Enter/Space) to record, Esc or clicking away cancels.
   // Used for local (focus-scoped) shortcut bindings.
 
   import { formatLocalKey } from '$lib/utils/localShortcuts';
+  import { settings } from '$lib/stores/settings';
+  import { getLocale } from '$paraglide/runtime.js';
 
   interface Props {
     value?: string;
+    label?: string;
     onchange?: (value: string) => void;
   }
 
-  let { value = '', onchange }: Props = $props();
+  let { value = '', label = '', onchange }: Props = $props();
 
   let listening = $state(false);
+  let zh = $derived.by(() => { void $settings.language; return getLocale().startsWith('zh'); });
 
   const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta', 'CapsLock']);
 
   function onKeydown(e: KeyboardEvent) {
-    if (!listening) return;
+    if (!listening) {
+      // Handle activation here so the window's own Space shortcut doesn't fire.
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        listening = true;
+      }
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
-
+    if (e.key === 'Escape') {
+      listening = false;
+      return;
+    }
     if (MODIFIER_KEYS.has(e.key)) return;
-
+    listening = false;
     onchange?.(e.key);
-    listening = false;
-  }
-
-  function onFocus() {
-    listening = true;
-  }
-  function onBlur() {
-    listening = false;
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<input
-  class="shortcut-input"
+<button
+  class="key-field"
   class:listening
-  readonly
-  value={formatLocalKey(value)}
-  placeholder="Click and press a key…"
-  onfocus={onFocus}
-  onblur={onBlur}
+  onclick={() => (listening = !listening)}
+  onblur={() => (listening = false)}
   onkeydown={onKeydown}
-  role="textbox"
-  tabindex="0"
-/>
+  aria-label={`${label} ${formatLocalKey(value)}`}
+  title={zh ? '点击后按下新的按键' : 'Click, then press a new key'}
+>
+  {#if listening}
+    <span class="prompt">{zh ? '请按下按键 · Esc 取消' : 'Press a key · Esc cancels'}</span>
+  {:else if value}
+    <kbd class="s-kbd">{formatLocalKey(value)}</kbd>
+  {:else}
+    <span class="prompt">{zh ? '未设置' : 'Not set'}</span>
+  {/if}
+</button>
 
 <style>
-  .shortcut-input {
-    background: var(--color-background);
-    border: 1px solid transparent;
-    border-radius: 4px;
-    color: var(--color-foreground);
+  .key-field {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    min-width: 168px;
+    height: 36px;
+    padding: 0 6px;
+    border-radius: 10px;
+    border: 1px dashed transparent;
+    background: none;
+    font: inherit;
     cursor: pointer;
-    font-size: 0.75rem;
-    font-family: 'Mona Sans Mono', monospace;
-    padding: 4px 8px;
-    text-align: center;
-    outline: none;
-    width: 140px;
-    transition: border-color 0.15s;
+    transition:
+      background 150ms ease,
+      border-color 150ms ease;
   }
 
-  .shortcut-input.listening {
-    border-color: var(--color-accent);
-    cursor: text;
+  .key-field:hover {
+    background: var(--ui-hover);
+    border-color: var(--ui-border-strong);
   }
 
-  .shortcut-input::placeholder {
-    color: var(--color-foreground-darker, var(--color-foreground));
-    opacity: 0.5;
-    font-family: system-ui, sans-serif;
-    font-size: 0.7rem;
+  .key-field.listening {
+    justify-content: center;
+    border-style: solid;
+    border-color: var(--ui-brand);
+    background: var(--ui-surface);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 20%, transparent);
+  }
+
+  .prompt {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ui-text-muted);
+  }
+
+  .listening .prompt {
+    color: var(--ui-brand-strong);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.55;
+    }
   }
 </style>

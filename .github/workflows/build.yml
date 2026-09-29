@@ -1,10 +1,8 @@
 name: Build / Test
 
+# PomoPipen: run by hand from the Actions tab (not tested on Linux / macOS yet).
 on:
-  push:
-    branches: [main, 'bugfix/**', 'feat/**']
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build-linux:

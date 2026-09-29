@@ -38,6 +38,8 @@ export interface LocalShortcutState {
   /** Current fullscreen state. */
   getFullscreen: () => boolean;
   setFullscreen: (v: boolean) => void;
+  /** Opens the jot pad (碎碎念); only the timer window has one. */
+  openJots?: () => void;
 }
 
 /**
@@ -95,6 +97,10 @@ export function createLocalShortcutHandler(state: LocalShortcutState): (e: Keybo
       const next = !state.getFullscreen();
       state.setFullscreen(next);
       getCurrentWebviewWindow().setFullscreen(next);
+    } else if (key === s.local_shortcut_jot && state.openJots) {
+      // preventDefault keeps the key itself out of the text box it opens.
+      e.preventDefault();
+      state.openJots();
     }
   };
 }

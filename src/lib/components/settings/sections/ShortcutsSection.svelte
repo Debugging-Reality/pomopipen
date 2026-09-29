@@ -5,14 +5,40 @@
   import ShortcutInput from '$lib/components/ShortcutInput.svelte';
   import LocalShortcutInput from '$lib/components/LocalShortcutInput.svelte';
   import SettingsToggle from '$lib/components/settings/SettingsToggle.svelte';
+  import { formatLocalKey } from '$lib/utils/localShortcuts';
+  import { notify } from '$lib/stores/toast';
+  import type { Settings } from '$lib/types';
   import * as m from '$paraglide/messages.js';
+  import { getLocale } from '$paraglide/runtime.js';
   import { isMac } from '$lib/utils/platform';
   import { openUrl } from '@tauri-apps/plugin-opener';
 
   const ACCESSIBILITY_URL =
     'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
 
+  type ShortcutKey = keyof Settings & (`local_shortcut_${string}` | `shortcut_${string}`);
+  const LOCAL: { key: ShortcutKey; label: () => string }[] = [
+    { key: 'local_shortcut_toggle', label: m.shortcuts_local_toggle_timer },
+    { key: 'local_shortcut_reset', label: m.shortcuts_local_reset_round },
+    { key: 'local_shortcut_skip', label: m.shortcuts_local_skip_round },
+    { key: 'local_shortcut_volume_down', label: m.shortcuts_local_volume_down },
+    { key: 'local_shortcut_volume_up', label: m.shortcuts_local_volume_up },
+    { key: 'local_shortcut_mute', label: m.shortcuts_local_mute },
+    { key: 'local_shortcut_fullscreen', label: m.shortcuts_local_fullscreen },
+    { key: 'local_shortcut_jot', label: () => (zh ? '记一笔碎碎念' : 'Jot something down') },
+  ];
+  const GLOBAL: { key: ShortcutKey; label: () => string }[] = [
+    { key: 'shortcut_toggle', label: m.shortcuts_toggle_timer },
+    { key: 'shortcut_reset', label: m.shortcuts_reset_timer },
+    { key: 'shortcut_skip', label: m.shortcuts_skip_round },
+    { key: 'shortcut_restart', label: m.shortcuts_restart_round },
+    { key: 'shortcut_jot', label: () => (zh ? '记一笔碎碎念（在任何软件里）' : 'Jot something down (from any app)') },
+  ];
+
   let trusted = $state(true);
+  let zh = $derived.by(() => { void $settings.language; return getLocale().startsWith('zh'); });
+  // A rejected binding, shown in place under the row that tried to take it.
+  let conflict = $state<{ key: ShortcutKey; text: string } | null>(null);
 
   async function checkTrusted() {
     trusted = await accessibilityTrusted();
@@ -36,228 +62,104 @@
     settings.set(updated);
   }
 
-  async function setShortcut(dbKey: string, value: string) {
-    const updated = await setSetting(dbKey, value);
-    settings.set(updated);
-    await reloadShortcuts();
-  }
-
-  async function setLocalShortcut(dbKey: string, value: string) {
-    const updated = await setSetting(dbKey, value);
-    settings.set(updated);
+  /** Saves a binding unless another action in the same list already uses it. */
+  async function assign(
+    list: typeof LOCAL,
+    item: (typeof LOCAL)[number],
+    value: string,
+    shown: string,
+    global: boolean
+  ) {
+    const clash = list.find((other) => other.key !== item.key && $settings[other.key] === value);
+    if (clash) {
+      conflict = {
+        key: item.key,
+        text: zh
+          ? `「${shown}」已用于「${clash.label()}」，没有保存。换一个按键试试。`
+          : `${shown} is already used by “${clash.label()}” — not saved.`,
+      };
+      return;
+    }
+    conflict = null;
+    if ($settings[item.key] === value) return;
+    try {
+      settings.set(await setSetting(item.key, value));
+      if (global) await reloadShortcuts();
+      notify(zh ? `已保存：${item.label()} → ${shown}` : `Saved: ${item.label()} → ${shown}`);
+    } catch (e) {
+      notify(zh ? `保存失败：${e}` : `Could not save: ${e}`, { tone: 'error' });
+    }
   }
 </script>
 
-<div class="section">
-  <!-- Local shortcuts first -->
-  <div class="shortcut-group">
-    <div class="group-heading">{m.shortcuts_local_heading()}</div>
-    <p class="note">{m.shortcuts_local_note()}</p>
-
-    <div class="row">
-      <span class="label">{m.shortcuts_local_toggle_timer()}</span>
-      <LocalShortcutInput
-        value={$settings.local_shortcut_toggle}
-        onchange={(v) => setLocalShortcut('local_shortcut_toggle', v)}
-      />
+<div class="s-groups">
+  <section class="s-group">
+    <h3 class="s-group-title">{m.shortcuts_local_heading()}</h3>
+    <p class="s-note">{m.shortcuts_local_note()}</p>
+    <div class="s-card">
+      {#each LOCAL as item (item.key)}
+        <div class="s-row">
+          <div class="s-text">
+            <span class="s-label">{item.label()}</span>
+            {#if conflict?.key === item.key}<span class="s-hint error" role="alert">{conflict.text}</span>{/if}
+          </div>
+          <div class="s-control">
+            <LocalShortcutInput
+              value={String($settings[item.key])}
+              label={item.label()}
+              onchange={(v) => assign(LOCAL, item, v, formatLocalKey(v), false)}
+            />
+          </div>
+        </div>
+      {/each}
     </div>
+  </section>
 
-    <div class="row">
-      <span class="label">{m.shortcuts_local_reset_round()}</span>
-      <LocalShortcutInput
-        value={$settings.local_shortcut_reset}
-        onchange={(v) => setLocalShortcut('local_shortcut_reset', v)}
+  <section class="s-group">
+    <h3 class="s-group-title">{m.shortcuts_global_heading()}</h3>
+    <p class="s-note">{m.shortcuts_note()}</p>
+    <div class="s-card">
+      <SettingsToggle
+        label={m.shortcuts_toggle_enabled()}
+        description={m.shortcuts_toggle_enabled_desc()}
+        checked={$settings.global_shortcuts_enabled}
+        onclick={() => toggle('global_shortcuts_enabled', $settings.global_shortcuts_enabled)}
       />
+
+      {#if isMac && !trusted}
+        <div class="s-row">
+          <span class="s-desc">{m.shortcuts_accessibility_notice()}</span>
+          <button class="s-btn" onclick={() => openUrl(ACCESSIBILITY_URL)}>
+            {m.shortcuts_accessibility_open()}
+          </button>
+        </div>
+      {/if}
+
+      {#each GLOBAL as item (item.key)}
+        <div class="s-row" class:is-disabled={!$settings.global_shortcuts_enabled}>
+          <div class="s-text">
+            <span class="s-label">{item.label()}</span>
+            {#if item.key === 'shortcut_jot'}
+              <span class="s-desc">{zh
+                ? '在别的软件里按下，计时器带着碎碎念出现；Enter 记下后自动退回原样。'
+                : 'Press it in any app: the timer comes up with the jot pad, and goes back once you press Enter.'}</span>
+            {/if}
+            {#if conflict?.key === item.key}<span class="s-hint error" role="alert">{conflict.text}</span>{/if}
+          </div>
+          <div class="s-control">
+            <ShortcutInput
+              value={String($settings[item.key])}
+              label={item.label()}
+              onchange={(v) => assign(GLOBAL, item, v, v.replace('Control', 'Ctrl'), true)}
+            />
+          </div>
+        </div>
+      {/each}
     </div>
-
-    <div class="row">
-      <span class="label">{m.shortcuts_local_skip_round()}</span>
-      <LocalShortcutInput
-        value={$settings.local_shortcut_skip}
-        onchange={(v) => setLocalShortcut('local_shortcut_skip', v)}
-      />
-    </div>
-
-    <div class="row">
-      <span class="label">{m.shortcuts_local_volume_down()}</span>
-      <LocalShortcutInput
-        value={$settings.local_shortcut_volume_down}
-        onchange={(v) => setLocalShortcut('local_shortcut_volume_down', v)}
-      />
-    </div>
-
-    <div class="row">
-      <span class="label">{m.shortcuts_local_volume_up()}</span>
-      <LocalShortcutInput
-        value={$settings.local_shortcut_volume_up}
-        onchange={(v) => setLocalShortcut('local_shortcut_volume_up', v)}
-      />
-    </div>
-
-    <div class="row">
-      <span class="label">{m.shortcuts_local_mute()}</span>
-      <LocalShortcutInput
-        value={$settings.local_shortcut_mute}
-        onchange={(v) => setLocalShortcut('local_shortcut_mute', v)}
-      />
-    </div>
-
-    <div class="row">
-      <span class="label">{m.shortcuts_local_fullscreen()}</span>
-      <LocalShortcutInput
-        value={$settings.local_shortcut_fullscreen}
-        onchange={(v) => setLocalShortcut('local_shortcut_fullscreen', v)}
-      />
-    </div>
-  </div>
-
-  <!-- Global shortcuts second -->
-  <div class="shortcut-group">
-    <div class="group-heading">{m.shortcuts_global_heading()}</div>
-    <p class="note">{m.shortcuts_note()}</p>
-
-    <SettingsToggle
-      label={m.shortcuts_toggle_enabled()}
-      description={m.shortcuts_toggle_enabled_desc()}
-      checked={$settings.global_shortcuts_enabled}
-      onclick={() => toggle('global_shortcuts_enabled', $settings.global_shortcuts_enabled)}
-    />
-
-    {#if isMac && !trusted}
-      <div class="accessibility-notice">
-        <p class="notice-text">{m.shortcuts_accessibility_notice()}</p>
-        <button class="notice-btn" onclick={() => openUrl(ACCESSIBILITY_URL)}>
-          {m.shortcuts_accessibility_open()}
-        </button>
-      </div>
+    {#if !$settings.global_shortcuts_enabled}
+      <p class="s-hint">
+        {zh ? '全局快捷键已关闭，打开上方开关后才能修改和使用。' : 'Global shortcuts are off — turn on the switch above to edit and use them.'}
+      </p>
     {/if}
-
-    <div class="shortcuts-body" class:disabled={!$settings.global_shortcuts_enabled}>
-      <div class="row">
-        <span class="label">{m.shortcuts_toggle_timer()}</span>
-        <ShortcutInput
-          value={$settings.shortcut_toggle}
-          onchange={(v) => setShortcut('shortcut_toggle', v)}
-        />
-      </div>
-
-      <div class="row">
-        <span class="label">{m.shortcuts_reset_timer()}</span>
-        <ShortcutInput
-          value={$settings.shortcut_reset}
-          onchange={(v) => setShortcut('shortcut_reset', v)}
-        />
-      </div>
-
-      <div class="row">
-        <span class="label">{m.shortcuts_skip_round()}</span>
-        <ShortcutInput
-          value={$settings.shortcut_skip}
-          onchange={(v) => setShortcut('shortcut_skip', v)}
-        />
-      </div>
-
-      <div class="row">
-        <span class="label">{m.shortcuts_restart_round()}</span>
-        <ShortcutInput
-          value={$settings.shortcut_restart}
-          onchange={(v) => setShortcut('shortcut_restart', v)}
-        />
-      </div>
-    </div>
-  </div>
+  </section>
 </div>
-
-<style>
-  .section {
-    display: flex;
-    flex-direction: column;
-    padding: 8px 0;
-  }
-
-  .shortcuts-body {
-    transition: opacity 0.15s;
-  }
-
-  .shortcuts-body.disabled {
-    opacity: 0.4;
-    pointer-events: none;
-  }
-
-  .accessibility-notice {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin: 8px 16px;
-    padding: 10px 14px;
-    border: 1px solid color-mix(in oklch, var(--color-foreground-darker) 35%, transparent);
-    border-radius: 6px;
-    background: color-mix(in oklch, var(--color-foreground-darker) 8%, transparent);
-  }
-
-  .notice-text {
-    font-size: 0.75rem;
-    color: var(--color-foreground-darker);
-    line-height: 1.5;
-    margin: 0;
-  }
-
-  .notice-btn {
-    align-self: flex-start;
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    color: var(--color-foreground);
-    background: color-mix(in oklch, var(--color-foreground) 10%, transparent);
-    border: 1px solid color-mix(in oklch, var(--color-foreground) 20%, transparent);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background var(--transition-default);
-  }
-
-  .notice-btn:hover {
-    background: color-mix(in oklch, var(--color-foreground) 18%, transparent);
-  }
-
-  .note {
-    font-size: 0.75rem;
-    color: var(--color-foreground-darker, var(--color-foreground));
-    opacity: 0.65;
-    padding: 8px 20px 16px;
-    line-height: 1.5;
-  }
-
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 20px;
-    border-bottom: 1px solid var(--color-separator);
-  }
-
-  .label {
-    font-size: 0.85rem;
-    color: var(--color-foreground);
-    letter-spacing: 0.02em;
-  }
-
-  .shortcut-group {
-    border-top: 1px solid var(--color-separator);
-    padding-top: 4px;
-  }
-
-  .shortcut-group:first-child {
-    border-top: none;
-    padding-top: 0;
-  }
-
-  .group-heading {
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-foreground-darker, var(--color-foreground));
-    opacity: 0.6;
-    margin: 0;
-    padding: 16px 20px 6px;
-  }
-</style>

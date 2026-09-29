@@ -1,9 +1,16 @@
+pub mod app_icon;
 pub mod audio;
+pub mod backgrounds;
+pub mod channel;
 pub mod commands;
 pub mod db;
+pub mod gcal;
+pub mod jots;
 pub mod notifications;
 pub mod settings;
 pub mod shortcuts;
+pub mod subjects;
+pub mod tasks;
 pub mod themes;
 pub mod timer;
 pub mod tray;
@@ -21,13 +28,20 @@ use commands::{
     app_version,
     check_update,
     install_update,
-    audio_clear_custom, audio_get_custom_info, audio_set_custom,
+    audio_clear_custom, audio_get_custom_info, audio_play_click, audio_set_custom,
     get_log_dir, open_log_dir,
+    jots_clear_handled, jots_create, jots_delete, jots_edit, jots_list, jots_restore,
+    jots_set_done, jots_to_task, jots_untask,
     notification_show,
     settings_get, settings_reset_defaults, settings_set,
     shortcuts_reload,
-    sessions_clear,
-    stats_get_detailed, stats_get_heatmap,
+    sessions_clear, sessions_create, sessions_delete, sessions_update,
+    stats_get_detailed, stats_get_heatmap, stats_get_range_events, stats_get_subject_breakdown,
+    stats_get_week_events,
+    subjects_create, subjects_delete, subjects_list, subjects_reorder,
+    subjects_set_active, subjects_set_archived, subjects_update,
+    tasks_create, tasks_delete, tasks_list, tasks_move, tasks_reorder,
+    tasks_rename, tasks_set_active, tasks_set_done, tasks_set_estimate,
     themes_list,
     timer_get_state, timer_reset, timer_restart_round, timer_skip, timer_toggle,
     window_set_visibility,
@@ -49,6 +63,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Windows opened after startup (settings, stats, tasks) get the custom icon too.
+        .on_page_load(|webview, _payload| {
+            if let Some(icon) = app_icon::current(webview.app_handle()) {
+                let _ = webview.window().set_icon(icon);
+            }
+        })
         .setup(|app| {
             // Capture Rust panics to the log file before the process terminates.
             std::panic::set_hook(Box::new(|info| {
@@ -72,7 +92,7 @@ pub fn run() {
                         env!("APP_BUILD_SHA")
                     );
                     log::info!(
-                        "Pomotroid v{} — data dir: {}",
+                        "PomoPipen v{} — data dir: {}",
                         env!("CARGO_PKG_VERSION"),
                         app_data_dir.display()
                     );
@@ -195,6 +215,17 @@ pub fn run() {
             // still hidden at this point so there is no visible flash.
             #[cfg(not(target_os = "macos"))]
             let _ = main_window.set_decorations(false);
+
+            let _ = main_window.set_title(channel::app_label(app.handle()));
+
+            // User-chosen app icon (Settings → Appearance), if any.
+            let custom_icon = app_icon::load_saved(&app_data_dir, &initial_settings.app_icon);
+            app.manage(app_icon::AppIconState(std::sync::Mutex::new(custom_icon)));
+            // Google Calendar sync (Settings → Calendar sync); syncs once shortly after startup.
+            gcal::init(app.handle(), app_data_dir.clone());
+            if let Some(icon) = app_icon::current(app.handle()) {
+                let _ = main_window.set_icon(icon);
+            }
 
             // Enable macOS window tiling/arrangement.
             //
@@ -367,6 +398,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            backgrounds::background_import,
+            app_icon::app_icon_set,
+            app_icon::app_icon_reset,
             // Timer
             timer_toggle,
             timer_reset,
@@ -381,9 +415,51 @@ pub fn run() {
             themes_list,
             // Sessions
             sessions_clear,
+            sessions_create,
+            sessions_update,
+            sessions_delete,
+            // Google Calendar sync
+            gcal::commands::gcal_status,
+            gcal::commands::gcal_import_client,
+            gcal::commands::gcal_connect,
+            gcal::commands::gcal_cancel_connect,
+            gcal::commands::gcal_sync_now,
+            gcal::commands::gcal_disconnect,
+            gcal::commands::gcal_set_auto,
+            // Subjects
+            subjects_list,
+            subjects_create,
+            subjects_update,
+            subjects_set_archived,
+            subjects_delete,
+            subjects_reorder,
+            subjects_set_active,
+            stats_get_subject_breakdown,
+            // Tasks
+            tasks_list,
+            tasks_create,
+            tasks_rename,
+            tasks_set_estimate,
+            tasks_move,
+            tasks_set_done,
+            tasks_delete,
+            tasks_reorder,
+            tasks_set_active,
+            // Jots (碎碎念)
+            jots_list,
+            jots_create,
+            jots_edit,
+            jots_set_done,
+            jots_to_task,
+            jots_untask,
+            jots_delete,
+            jots_restore,
+            jots_clear_handled,
             // Stats
             stats_get_detailed,
             stats_get_heatmap,
+            stats_get_week_events,
+            stats_get_range_events,
             // Window
             window_set_visibility,
             // Shortcuts
@@ -392,6 +468,7 @@ pub fn run() {
             audio_set_custom,
             audio_clear_custom,
             audio_get_custom_info,
+            audio_play_click,
             // Notifications
             notification_show,
             // Diagnostics

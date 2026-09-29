@@ -1,9 +1,13 @@
 <script lang="ts">
-  import type { HeatmapStats, HeatmapEntry } from '$lib/types';
+  import type { HeatmapStats, HeatmapEntry, SubjectTotal } from '$lib/types';
   import * as m from '$paraglide/messages.js';
   import { getLocale } from '$paraglide/runtime.js';
+  import SubjectBreakdown from './SubjectBreakdown.svelte';
+  import { settings } from '$lib/stores/settings';
+  import { dayOfWeek } from '$lib/utils/calendar';
 
-  let { heatmap }: { heatmap: HeatmapStats | null } = $props();
+  let { heatmap, breakdown }: { heatmap: HeatmapStats | null; breakdown: SubjectTotal[] | null } =
+    $props();
 
   // Heatmap grid constants
   const CELL = 11;
@@ -18,12 +22,13 @@
   const MONTH_NAMES: string[] = $derived(
     Array.from({ length: 12 }, (_, i) => monthFmt.format(new Date(2000, i, 1)))
   );
-  // Row labels: Mon (row 1), Wed (row 3), Fri (row 5) — reference dates that land on those days
-  const ROW_LABELS: Record<number, string> = $derived({
-    1: dowFmt.format(new Date(2000, 0, 3)), // Monday
-    3: dowFmt.format(new Date(2000, 0, 5)), // Wednesday
-    5: dowFmt.format(new Date(2000, 0, 7)), // Friday
-  });
+  // Rows follow the week-start setting (Sunday or Monday on top).
+  const mondayFirst = $derived($settings.week_starts_monday);
+  // Row labels: Mon, Wed, Fri — reference dates that land on those days
+  const ROW_LABELS: Record<number, string> = $derived(Object.fromEntries(
+    [new Date(2000, 0, 3), new Date(2000, 0, 5), new Date(2000, 0, 7)] // Monday, Wednesday, Friday
+      .map((d) => [dayOfWeek(d, mondayFirst), dowFmt.format(d)])
+  ));
 
   // Year navigation state
   const currentYear = new Date().getFullYear();
@@ -56,15 +61,15 @@
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Grid start: Sunday on or before Jan 1 of the selected year
+    // Grid start: first day of the week containing Jan 1 of the selected year
     const jan1 = new Date(year, 0, 1);
     const gridStart = new Date(jan1);
-    gridStart.setDate(jan1.getDate() - jan1.getDay());
+    gridStart.setDate(jan1.getDate() - dayOfWeek(jan1, mondayFirst));
 
-    // Grid end: Saturday on or after Dec 31 of the selected year
+    // Grid end: last day of the week containing Dec 31
     const dec31 = new Date(year, 11, 31);
     const gridEnd = new Date(dec31);
-    gridEnd.setDate(dec31.getDate() + (6 - dec31.getDay()));
+    gridEnd.setDate(dec31.getDate() + (6 - dayOfWeek(dec31, mondayFirst)));
 
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
     const weekCount = Math.round((gridEnd.getTime() - gridStart.getTime()) / msPerWeek) + 1;
@@ -148,9 +153,9 @@
 <svelte:head>
   <style>
     :root {
-      --heat-0: color-mix(in oklch, var(--color-foreground) 6%, var(--color-background));
-      --heat-1: color-mix(in oklch, var(--color-focus-round) 28%, var(--color-background));
-      --heat-2: color-mix(in oklch, var(--color-focus-round) 60%, var(--color-background));
+      --heat-0: var(--ui-border);
+      --heat-1: color-mix(in oklch, var(--color-focus-round) 30%, var(--ui-surface));
+      --heat-2: color-mix(in oklch, var(--color-focus-round) 62%, var(--ui-surface));
       --heat-3: var(--color-focus-round);
     }
   </style>
@@ -308,6 +313,8 @@
       </div>
     </div>
 
+    <SubjectBreakdown items={breakdown ?? []} />
+
     {#if !hasData}
       <div class="empty-overlay"><span>{m.stats_empty_history()}</span></div>
     {/if}
@@ -316,78 +323,75 @@
 
 <style>
   .view {
+    position: relative;
     display: flex;
     flex-direction: column;
-    height: 100%;
-    position: relative;
+    gap: 16px;
     animation: app-fade-in 0.2s ease;
   }
 
   .loading {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-foreground-darker);
-    font-size: 0.85rem;
-    opacity: 0.7;
+    padding: 40px;
+    text-align: center;
+    color: var(--ui-text-muted);
+    font-size: 13px;
   }
 
-  /* ── Heatmap ──────────────────────────────────────────────── */
+  /* ── Heatmap card ─────────────────────────────────────────── */
   .heatmap-section {
-    flex: 1;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px 24px 8px;
-    overflow: hidden;
+    padding: 16px 18px;
+    border-radius: 14px;
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+    overflow-x: auto;
   }
 
+  /* Auto margins center it without clipping the left edge when it overflows. */
   .heatmap-wrap {
     display: flex;
     flex-direction: column;
     gap: 8px;
     align-items: flex-start;
+    margin: 0 auto;
   }
 
-  /* ── Year navigation ─────────────────────────────────────── */
   .year-nav {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-left: 28px; /* align with heatmap grid left edge */
+    gap: 6px;
+    margin-left: 28px;
   }
 
   .year-label {
-    font-size: 0.82rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.04em;
-    color: var(--color-foreground-darker);
     min-width: 3.2em;
     text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ui-text);
   }
 
   .year-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--color-foreground-darker);
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    transition:
-      color 0.15s,
-      background 0.15s;
+    width: 26px;
+    height: 26px;
     padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--ui-text-muted);
+    cursor: pointer;
+    transition:
+      color 150ms ease,
+      background 150ms ease;
   }
 
   .year-btn:hover:not(:disabled) {
-    color: var(--color-foreground);
-    background: var(--color-hover);
+    color: var(--ui-text);
+    background: var(--ui-hover);
   }
 
   .year-btn:disabled {
@@ -395,7 +399,6 @@
     cursor: default;
   }
 
-  /* ── Heatmap SVG ─────────────────────────────────────────── */
   .heatmap-svg {
     display: block;
     overflow: visible;
@@ -411,44 +414,36 @@
   }
 
   .cell-dimmed {
-    opacity: 0.3;
+    opacity: 0.35;
   }
 
   .month-label {
-    fill: var(--color-foreground-darker);
-    font-size: 9px;
-    font-weight: 500;
-    letter-spacing: 0.03em;
+    fill: var(--ui-text-muted);
+    font-size: 10px;
+    font-weight: 600;
     cursor: default;
   }
 
   .dow-label {
-    fill: var(--color-foreground-darker);
-    font-size: 8px;
-    letter-spacing: 0.02em;
+    fill: var(--ui-text-muted);
+    font-size: 9px;
     cursor: default;
   }
 
   .cell-tooltip {
-    --tooltip-bg: var(
-      --color-background-light,
-      color-mix(in oklch, var(--color-foreground) 10%, var(--color-background))
-    );
     position: fixed;
     transform: translateY(-100%);
-    background: var(--tooltip-bg);
-    color: var(--color-foreground);
-    font-size: 0.72rem;
-    line-height: 1.4;
-    padding: 5px 9px;
-    border-radius: 4px;
     width: max-content;
     max-width: 240px;
-    white-space: normal;
+    padding: 5px 9px;
+    border-radius: 8px;
+    background: var(--ui-text);
+    color: var(--ui-surface);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
     pointer-events: none;
     z-index: 9999;
-    box-shadow: 0 2px 8px color-mix(in oklch, black 30%, transparent);
-    border: 1px solid color-mix(in oklch, var(--color-foreground) 12%, transparent);
   }
 
   .cell-tooltip::after {
@@ -458,10 +453,9 @@
     left: var(--arrow-left, 50%);
     transform: translateX(-50%);
     border: 5px solid transparent;
-    border-top-color: var(--tooltip-bg);
+    border-top-color: var(--ui-text);
   }
 
-  /* ── Legend ──────────────────────────────────────────────── */
   .legend {
     display: flex;
     align-items: center;
@@ -470,33 +464,32 @@
   }
 
   .legend-label {
-    font-size: 9px;
-    color: var(--color-foreground-darker);
-    padding: 0 3px;
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--ui-text-muted);
   }
 
   .legend-cell {
     width: 11px;
     height: 11px;
-    border-radius: 2px;
+    border-radius: 3px;
   }
 
-  /* ── Lifetime totals ─────────────────────────────────────── */
+  /* ── Lifetime totals ──────────────────────────────────────── */
   .totals {
-    display: flex;
-    align-items: stretch;
-    border-top: 1px solid var(--color-separator);
-    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .total-card {
-    flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 18px 24px;
+    gap: 6px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface);
     animation: card-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
     animation-delay: var(--delay, 0ms);
   }
@@ -513,49 +506,41 @@
   }
 
   .total-label {
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-foreground-darker);
+    font-size: 12.5px;
+    color: var(--ui-text-muted);
   }
 
   .total-value {
-    font-size: 1.8rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-    color: var(--color-foreground);
-    line-height: 1;
     display: flex;
     align-items: baseline;
     gap: 4px;
+    font-size: 26px;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--ui-text);
   }
 
   .total-unit {
-    font-size: 0.85rem;
-    font-weight: 400;
-    color: var(--color-foreground-darker);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ui-text-muted);
   }
 
   .total-divider {
-    width: 1px;
-    background: var(--color-separator);
-    align-self: stretch;
-    margin: 10px 0;
+    display: none;
   }
 
-  /* ── Empty overlay ───────────────────────────────────────── */
   .empty-overlay {
     position: absolute;
-    inset: 40px 0 80px 0;
+    top: 60px;
+    left: 0;
+    right: 0;
     display: flex;
-    align-items: center;
     justify-content: center;
-    color: var(--color-foreground-darker);
-    font-size: 0.82rem;
-    font-style: italic;
-    opacity: 0.65;
+    font-size: 13px;
+    color: var(--ui-text-muted);
     pointer-events: none;
   }
 </style>

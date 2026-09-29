@@ -1,7 +1,7 @@
 [package]
-name = "pomotroid"
+name = "pomopipen"
 version = "1.7.1"
-description = "A simple and visually-pleasing Pomodoro timer"
+description = "A study-focused Pomodoro timer, forked from Pomotroid"
 authors = ["Christopher Murphy <flyweight@pm.me>"]
 edition = "2021"
 
@@ -11,14 +11,14 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "pomotroid_lib"
+name = "pomopipen_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
 tauri-plugin-opener = "2"
 tauri-plugin-log = "2"
 log = "0.4"
@@ -39,7 +39,21 @@ futures-util = "0.3"
 rodio = { version = "0.22", default-features = false, features = ["playback", "wav", "mp3", "vorbis"] }
 symphonia-codec-adpcm = "0.6.0"
 tiny-skia = "0.12"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "ico"] }
 notify = "8"
+# Google Calendar sync (src/gcal): HTTPS through the Windows system proxy,
+# OAuth with PKCE, local days for merging rounds.
+reqwest = { version = "0.13", default-features = false, features = ["json", "form", "query", "system-proxy", "rustls-no-provider"] }
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.3"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+url = "2"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[target.'cfg(windows)'.dependencies]
+# Reads the system proxy (Internet Settings) for Google Calendar sync.
+windows-registry = "0.6"
 
 [dev-dependencies]
 tokio-tungstenite = "0.29"

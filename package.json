@@ -1,15 +1,15 @@
 {
-  "name": "pomotroid",
+  "name": "pomopipen",
   "version": "1.7.1",
-  "description": "A simple and visually-pleasing Pomodoro timer",
+  "description": "A study-focused Pomodoro timer, built on Pomotroid",
   "author": {
     "email": "flyweight@pm.me",
     "name": "Christopher Murphy",
     "url": "https://github.com/splode"
   },
-  "homepage": "https://github.com/Splode/pomotroid",
+  "homepage": "https://github.com/Debugging-Reality/pomopipen",
   "license": "MIT",
-  "repository": "github:splode/pomotroid",
+  "repository": "github:Debugging-Reality/pomopipen",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

@@ -23,6 +23,51 @@
   font-display: block;
 }
 
+/* Display serif pairing — used only for fixed, translated UI strings (round
+   labels, section headings, window titles): text that always comes from
+   src/messages/*.json, never free text a user typed. Both subsetted to
+   exactly the characters those message files use (see static/fonts/LICENSE.txt
+   for provenance) — safe for that closed set, but NOT for subject/task names
+   or any other user-entered text, which stays on the sans stack below so an
+   uncommon character never mid-sentence-swaps to a fallback font. */
+@font-face {
+  font-family: 'Source Serif Display';
+  src: url('/fonts/SourceSerif4Variable.woff2') format('woff2');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Source Han Serif Display';
+  src: url('/fonts/SourceHanSerifCN-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Source Han Serif Display';
+  src: url('/fonts/SourceHanSerifCN-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Source Han Serif Display';
+  src: url('/fonts/SourceHanSerifCN-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: block;
+}
+
+/* Classic Tomato headings: Noto Serif SC (Source Han Serif design) at weight
+   800, subset by scripts/subset-classic-font.py — fixed UI strings only. */
+@font-face {
+  font-family: 'Classic Serif SC';
+  src: url('/fonts/ClassicSerifSC-Heavy.woff2') format('woff2');
+  font-weight: 700 900;
+  font-display: block;
+}
+
 :root {
   /* Theme colors (defaults; overridden by the active theme at runtime) */
   --color-long-round: #c75000;
@@ -48,6 +93,44 @@
 
   /* Optical sizing — adapts letterforms to font-size automatically */
   font-optical-sizing: auto;
+
+  /* Display serif stack — fixed UI strings only (see the @font-face block
+     above for why). Georgia/Songti/serif are the fallback chain for any
+     locale or platform where the embedded subset doesn't apply. */
+  --font-display: 'Source Serif Display', 'Source Han Serif Display', Georgia, 'Songti SC', serif;
+
+  /* UI text: Mona Sans for Latin and digits, the platform's CJK UI face for Chinese. */
+  --font-ui: 'Mona Sans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC',
+    system-ui, sans-serif;
+
+  /* Semantic UI tokens (settings-style windows). The bundled themes define
+     every one explicitly in their JSON (validated for contrast in
+     tests/visual-features.test.mjs); these fallbacks keep custom themes usable. */
+  --ui-brand: var(--color-accent);
+  --ui-brand-strong: var(--color-accent);
+  --ui-on-brand: var(--color-background);
+  --ui-page: var(--color-background);
+  --ui-surface: color-mix(in oklch, var(--color-background) 94%, var(--color-foreground));
+  --ui-sidebar: var(--color-background-light);
+  --ui-text: var(--color-foreground);
+  --ui-text-muted: var(--color-foreground-darker);
+  --ui-border: color-mix(in oklch, var(--color-foreground) 12%, transparent);
+  --ui-border-strong: color-mix(in oklch, var(--color-foreground) 26%, transparent);
+  --ui-hover: var(--color-hover);
+  --ui-selected: color-mix(in oklch, var(--color-accent) 20%, transparent);
+  --ui-accent-2: var(--color-short-round);
+  --ui-switch-off: color-mix(in oklch, var(--color-foreground) 42%, transparent);
+  --ui-danger: #d64545;
+  --ui-danger-soft: color-mix(in oklch, #d64545 14%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
 }
 
 *,
@@ -93,4 +176,32 @@ body {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* Three bright, user-selected themes. These tokens also color the chrome,
+   separators and text outside the timer itself. */
+html[data-pomo-theme] {
+  --font-display: 'Mona Sans', system-ui, sans-serif;
+  --color-separator: color-mix(in srgb, var(--pomo-line) 48%, transparent);
+  --color-hover: color-mix(in srgb, var(--pomo-main) 15%, transparent);
+}
+
+html[data-pomo-theme] :is(.window, .app) {
+  color: var(--pomo-ink);
+}
+
+html[data-pomo-theme] :is(.window, .app) .titlebar {
+  background: var(--pomo-main);
+  border-bottom: 2px solid var(--pomo-line);
+}
+
+html[data-pomo-theme] :is(.window, .app) .titlebar :is(.titlebar-label, .btn-close, .btn-icon, .btn-max, .zoom button) {
+  color: var(--pomo-on);
+  font-family: 'Mona Sans', system-ui, sans-serif;
+  font-weight: 850;
+}
+
+html[data-pomo-theme] :is(.window, .app) :is(button, input, select):focus-visible {
+  outline: 3px solid var(--pomo-alt);
+  outline-offset: 2px;
 }

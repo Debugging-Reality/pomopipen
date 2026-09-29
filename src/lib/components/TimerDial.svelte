@@ -50,13 +50,16 @@
 </script>
 
 <svg class="dial" viewBox="0 0 230 230" aria-hidden="true">
+  <!-- Outer hairline bezel — a fine containing ring, like a watch face frame,
+       so the thinner progress arc below doesn't float in empty space. -->
+  <circle class="bezel" cx="115" cy="115" r="112" fill="none" />
   <!-- Background track -->
   <path
     class="track"
     d="M115,5c60.8,0,110,49.2,110,110s-49.2,110-110,110S5,175.8,5,115S54.2,5,115,5"
     fill="none"
     stroke="var(--color-background-light)"
-    stroke-width="2"
+    stroke-width="1.5"
   />
   <!-- Progress arc -->
   <path
@@ -64,7 +67,7 @@
     d="M115,5c60.8,0,110,49.2,110,110s-49.2,110-110,110S5,175.8,5,115S54.2,5,115,5"
     fill="none"
     stroke={strokeColor(snap.round_type)}
-    stroke-width="10"
+    stroke-width="5"
     stroke-linecap="round"
     stroke-dasharray={CIRCUMFERENCE}
     stroke-dashoffset={$dashOffset}
@@ -76,5 +79,10 @@
     width: 220px;
     height: 220px;
     display: block;
+  }
+
+  .bezel {
+    stroke: color-mix(in oklch, var(--color-foreground) 12%, transparent);
+    stroke-width: 1;
   }
 </style>

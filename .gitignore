@@ -10,3 +10,14 @@ thumbs.db
 *.cert
 .svelte-kit/
 build/
+# Google OAuth client for the calendar sync (src-tauri/google/README.md)
+src-tauri/google/client.json
+# Classic Tomato timer photos: placeholders cut from reference images of unknown
+# licence (static/classic-tomato/README.txt). Local dev only, never publish.
+static/classic-tomato/*.png
+docs/design/classic-tomato/assets/*.png
+# Local-only notes: machine paths and personal usage logs (not for the public repo)
+CLAUDE.md
+docs/HANDOFF.md
+docs/DESIGN_V2_IMPLEMENTATION.md
+docs/design/DESIGN-V2-proposal.md

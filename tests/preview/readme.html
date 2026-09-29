@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PomoPipen · README images</title>
+<!-- README banners for GitHub. Sample data only; no Classic Tomato timer photos
+     (they are placeholders that must not be published).
+     /readme.html?slide=hero|mini&lang=en|zh|ja   (1280 × 640 / 1280 × 440)
+     Captured by scripts/capture-readme-images.ps1. -->
+<style>
+  @font-face { font-family: 'Source Serif 4'; src: url('/fonts/SourceSerif4Variable.woff2') format('woff2'); font-weight: 200 900; }
+  @font-face { font-family: 'Mona Sans'; src: url('/fonts/MonaSansVF.woff2') format('woff2'); font-weight: 200 900; font-stretch: 75% 125%; }
+  :root { --paper: #F5EBD8; --ink: #202620; --ink-2: #626456; --tomato: #C83224; --leaf: #244B36;
+    --serif: 'Source Serif 4', 'Noto Serif SC', Georgia, serif; --sans: 'Mona Sans', 'Microsoft YaHei UI', 'Yu Gothic UI', system-ui, sans-serif; }
+  :root[lang='zh'] { --serif: 'Source Serif 4', 'Noto Serif SC', serif; }
+  :root[lang='ja'] { --serif: 'Source Serif 4', 'Noto Serif SC', serif; --sans: 'Mona Sans', 'Yu Gothic UI', 'Yu Gothic', system-ui, sans-serif; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; overflow: hidden; }
+  body { font-family: var(--sans); color: var(--ink);
+    background: linear-gradient(color-mix(in srgb, var(--paper) 82%, transparent), color-mix(in srgb, var(--paper) 82%, transparent)), url('/classic-tomato/art/vine.svg') 0 0 / 420px repeat, var(--paper); }
+  .slide { display: none; position: relative; width: 1280px; }
+  .slide.on { display: block; }
+  #hero { height: 640px; }
+  #mini { height: 440px; }
+  .eyebrow { font-size: 15px; font-weight: 750; letter-spacing: .22em; color: var(--tomato); }
+  h1 { font-family: var(--serif); font-weight: 800; font-size: 60px; line-height: 1.06; letter-spacing: -.01em; margin: 14px 0 20px; }
+  :root:not([lang='en']) h1 { font-size: 52px; line-height: 1.25; letter-spacing: .02em; }
+  h2 { font-family: var(--serif); font-weight: 800; font-size: 40px; line-height: 1.12; margin: 10px 0 14px; }
+  :root:not([lang='en']) h2 { font-size: 36px; line-height: 1.3; }
+  .lede { font-size: 19px; line-height: 1.55; color: var(--ink-2); }
+  .side { position: absolute; left: 72px; top: 72px; width: 540px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .chip { font-size: 14px; font-weight: 650; padding: 6px 12px; border-radius: 999px; background: #FFF8EA;
+    box-shadow: 0 0 0 1px rgb(32 38 32 / 16%); }
+  .chip.red { background: var(--tomato); color: #FFF8EA; box-shadow: none; }
+  .credit { position: absolute; left: 72px; bottom: 44px; font-size: 14px; color: var(--ink-2); }
+  .credit b { font-family: var(--serif); font-weight: 800; font-size: 20px; color: var(--tomato); margin-right: 10px; }
+  .frame { position: absolute; border: 0; overflow: hidden; background: var(--paper); border-radius: 10px;
+    box-shadow: 0 0 0 1px rgb(32 38 32 / 18%), 0 26px 50px -20px rgb(60 35 10 / 45%); transform-origin: 0 0; }
+  .label { position: absolute; width: 240px; text-align: center; font-size: 15px; font-weight: 700; }
+  .label small { display: block; font-size: 13px; font-weight: 500; color: var(--ink-2); margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<section class="slide" id="hero">
+  <div class="side">
+    <div class="eyebrow">POMOPIPEN</div>
+    <h1 data-t="heroTitle"></h1>
+    <p class="lede" data-t="heroLede"></p>
+    <div class="chips"><span class="chip red" data-t="chip1"></span><span class="chip" data-t="chip2"></span><span class="chip" data-t="chip3"></span><span class="chip" data-t="chip4"></span></div>
+  </div>
+  <div class="credit"><b>PomoPipen</b><span data-t="credit"></span></div>
+  <iframe class="frame" data-src="theme=citrus-club&state=paused" style="left: 626px; top: 118px; width: 360px; height: 478px; transform: rotate(-6deg) scale(.84)"></iframe>
+  <iframe class="frame" data-src="theme=berry-planet&state=idle" style="left: 962px; top: 88px; width: 360px; height: 478px; transform: rotate(6deg) scale(.84)"></iframe>
+  <iframe class="frame" data-src="theme=cherry-soda&state=running" style="left: 776px; top: 64px; width: 360px; height: 478px; transform: scale(1.06)"></iframe>
+</section>
+
+<section class="slide" id="mini">
+  <div class="side" style="top: 64px; width: 390px">
+    <div class="eyebrow" data-t="miniEyebrow"></div>
+    <h2 data-t="miniTitle"></h2>
+    <p class="lede" data-t="miniLede"></p>
+  </div>
+  <iframe class="frame" data-src="theme=cherry-soda&state=running&win=240x240" style="left: 490px; top: 80px; width: 240px; height: 240px"></iframe>
+  <iframe class="frame" data-src="theme=citrus-club&state=paused&win=240x240" style="left: 750px; top: 80px; width: 240px; height: 240px"></iframe>
+  <iframe class="frame" data-src="theme=berry-planet&state=running&win=240x240" style="left: 1010px; top: 80px; width: 240px; height: 240px"></iframe>
+  <div class="label" style="left: 490px; top: 340px" data-t="cherry"></div>
+  <div class="label" style="left: 750px; top: 340px" data-t="citrus"></div>
+  <div class="label" style="left: 1010px; top: 340px" data-t="berry"></div>
+</section>
+
+<script>
+  const T = {
+    en: {
+      heroTitle: 'Focus,<br>one tomato<br>at a time.',
+      heroLede: 'A study-focused Pomodoro timer: every round belongs to a subject, tasks keep their own time, and your week fills up with tomatoes.',
+      chip1: 'Subjects &amp; tasks', chip2: 'Week calendar', chip3: 'Jots', chip4: 'Google Calendar sync',
+      credit: 'Built on Pomotroid · redesigned to my own taste',
+      miniEyebrow: 'MINI MODE', miniTitle: 'Small when you need it.',
+      miniLede: 'Shrink the window to 240 × 240: phase, time and the main button stay.',
+      cherry: 'Cherry Soda<small>cherry red · candy pink · lemon</small>',
+      citrus: 'Citrus Club<small>cobalt blue · citrus yellow</small>',
+      berry: 'Berry Planet<small>violet · berry pink · starlight</small>',
+    },
+    zh: {
+      heroTitle: '专注，<br>一次一颗番茄。',
+      heroLede: '为学习而做的番茄钟：每一轮都记在科目上，待办自己记时间，一周下来被番茄填满。',
+      chip1: '科目与待办', chip2: '周历', chip3: '碎碎念', chip4: 'Google 日历同步',
+      credit: '基于 Pomotroid · 按我自己的喜好重新设计',
+      miniEyebrow: '迷你模式', miniTitle: '需要时，它可以很小。',
+      miniLede: '把窗口缩到 240 × 240：阶段、时间和主按钮都还在。',
+      cherry: '樱桃汽水<small>樱桃红 · 糖果粉 · 柠檬黄</small>',
+      citrus: '蓝柠午后<small>钴蓝 · 柑橘黄</small>',
+      berry: '莓果星球<small>紫罗兰 · 莓果粉 · 星光</small>',
+    },
+    ja: {
+      heroTitle: '集中を、<br>トマトひとつずつ。',
+      heroLede: '勉強のためのポモドーロタイマー。毎回の集中は科目に記録され、タスクは自分の時間を持ち、一週間がトマトで埋まっていきます。',
+      chip1: '科目とタスク', chip2: '週間カレンダー', chip3: 'メモ', chip4: 'Google カレンダー同期',
+      credit: 'Pomotroid をベースに、自分好みに再デザイン',
+      miniEyebrow: 'ミニモード', miniTitle: '必要なときは、小さく。',
+      miniLede: 'ウィンドウを 240 × 240 まで縮めても、フェーズ・時間・メインボタンは残ります。',
+      cherry: 'Cherry Soda<small>チェリーレッド · キャンディピンク · レモン</small>',
+      citrus: 'Citrus Club<small>コバルトブルー · シトラスイエロー</small>',
+      berry: 'Berry Planet<small>バイオレット · ベリーピンク · スターライト</small>',
+    },
+  };
+  const q = new URLSearchParams(location.search);
+  const lang = T[q.get('lang')] ? q.get('lang') : 'en';
+  const ui = lang === 'zh' ? 'zh' : 'en'; // the app UI ships English and Chinese
+  document.documentElement.lang = lang;
+  document.getElementById(q.get('slide') ?? 'hero')?.classList.add('on');
+  for (const el of document.querySelectorAll('[data-t]')) el.innerHTML = T[lang][el.dataset.t];
+  for (const f of document.querySelectorAll('.slide.on iframe[data-src]')) {
+    const extra = new URLSearchParams(f.dataset.src);
+    if (!extra.has('win')) extra.set('win', '360x478');
+    f.src = `/?view=timers&chrome=none&bg=none&lang=${ui}&${extra}`;
+  }
+</script>
+</body>
+</html>

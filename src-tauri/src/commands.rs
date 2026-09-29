@@ -9,9 +9,14 @@ use std::sync::Arc;
 
 use crate::audio::{self, AudioManager};
 use crate::notifications;
-use crate::db::{queries, DbState};
+use crate::db::{calendar, queries, DbState};
+use crate::db::calendar::FocusRecord;
+use crate::db::queries::SubjectFilter;
+use crate::jots::{self, Jot};
+use crate::subjects::{self, Subject};
 use crate::settings::{self, Settings};
 use crate::shortcuts;
+use crate::tasks::{self, Task};
 use crate::themes::{self, Theme};
 use crate::timer::{TimerController, TimerSnapshot};
 use crate::tray::{self, TrayState};
@@ -195,7 +200,7 @@ pub fn settings_set(
     }
 
     // Re-register global shortcuts when any shortcut key changes or the enabled flag toggles.
-    if matches!(key.as_str(), "shortcut_toggle" | "shortcut_reset" | "shortcut_skip" | "shortcut_restart" | "global_shortcuts_enabled") {
+    if matches!(key.as_str(), "shortcut_toggle" | "shortcut_reset" | "shortcut_skip" | "shortcut_restart" | "shortcut_jot" | "global_shortcuts_enabled") {
         shortcuts::register_all(&app, &new_settings);
     }
 
@@ -268,10 +273,13 @@ pub fn settings_reset_defaults(
 
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
 
+    // The icon setting is gone now; show the built-in icon again.
+    crate::app_icon::clear(&app);
+
     // Clear custom alert sounds: delete files from disk and reset in-memory paths.
     if let Some(audio_state) = app.try_state::<Arc<AudioManager>>() {
         let audio_dir = data_dir.join("audio");
-        for stem in [audio::STEM_WORK, audio::STEM_SHORT, audio::STEM_LONG] {
+        for stem in [audio::STEM_WORK, audio::STEM_SHORT, audio::STEM_LONG, audio::STEM_CLICK] {
             if let Ok(entries) = std::fs::read_dir(&audio_dir) {
                 for entry in entries.filter_map(|e| e.ok()) {
                     let p = entry.path();
@@ -284,6 +292,7 @@ pub fn settings_reset_defaults(
         audio_state.clear_custom_path("work_alert");
         audio_state.clear_custom_path("short_break_alert");
         audio_state.clear_custom_path("long_break_alert");
+        audio_state.clear_custom_path("button_click");
         log::info!("[audio] custom sounds cleared on settings reset");
     }
 
@@ -332,22 +341,95 @@ pub fn sessions_clear(db: State<'_, DbState>, app: AppHandle) -> Result<(), Stri
     Ok(())
 }
 
+// Week calendar editing (fork addition): focus records added, moved, resized
+// or deleted by hand. Each change emits `sessions:changed` (stats, charts,
+// task totals and the timer's today count refresh) and schedules a Google
+// Calendar sync.
+
+#[tauri::command]
+pub fn sessions_create(record: FocusRecord, db: State<'_, DbState>, app: AppHandle) -> Result<i64, String> {
+    let id = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        calendar::create_record(&conn, &record, chrono::Utc::now().timestamp())?
+    };
+    log::info!("[sessions] added by hand: id={id} start={} {}s", record.started_at, record.duration_secs);
+    sessions_changed(&app, record.started_at);
+    Ok(id)
+}
+
+#[tauri::command]
+pub fn sessions_update(id: i64, record: FocusRecord, db: State<'_, DbState>, app: AppHandle) -> Result<(), String> {
+    let before = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        calendar::update_record(&conn, id, &record, chrono::Utc::now().timestamp())?
+    };
+    log::info!(
+        "[sessions] edited by hand: id={id} start {}→{} {}s→{}s",
+        before.started_at, record.started_at, before.duration_secs, record.duration_secs
+    );
+    sessions_changed(&app, before.started_at.min(record.started_at));
+    Ok(())
+}
+
+/// Returns the deleted record, so the calendar can offer to put it back.
+#[tauri::command]
+pub fn sessions_delete(id: i64, db: State<'_, DbState>, app: AppHandle) -> Result<FocusRecord, String> {
+    let removed = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        calendar::delete_record(&conn, id)?
+    };
+    log::info!("[sessions] deleted by hand: id={id} start={} {}s", removed.started_at, removed.duration_secs);
+    sessions_changed(&app, removed.started_at);
+    Ok(removed)
+}
+
+fn sessions_changed(app: &AppHandle, earliest_start: i64) {
+    app.emit("sessions:changed", ()).ok();
+    crate::gcal::sessions_edited(app, earliest_start);
+}
+
 // CMD-05 — Stats commands
 // ---------------------------------------------------------------------------
 
+#[tauri::command]
+pub fn stats_get_week_events(
+    start: i64,
+    end: i64,
+    subject: Option<SubjectFilter>,
+    db: State<'_, DbState>,
+) -> Result<Vec<crate::db::calendar::WeekEvent>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::calendar::get_week_events(&conn, start, end, subject.unwrap_or_default())
+}
+
+#[tauri::command]
+pub fn stats_get_range_events(
+    start: i64,
+    end: i64,
+    subject: Option<SubjectFilter>,
+    db: State<'_, DbState>,
+) -> Result<Vec<crate::db::calendar::WeekEvent>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    crate::db::calendar::get_range_events(&conn, start, end, subject.unwrap_or_default())
+}
+
 /// Batched stats for Today + This Week tabs (minimises IPC round-trips).
 #[tauri::command]
-pub fn stats_get_detailed(db: State<'_, DbState>) -> Result<DetailedStats, String> {
+pub fn stats_get_detailed(
+    subject: Option<SubjectFilter>,
+    db: State<'_, DbState>,
+) -> Result<DetailedStats, String> {
+    let filter = subject.unwrap_or_default();
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let today = queries::get_daily_stats(&conn).map_err(|e| {
+    let today = queries::get_daily_stats(&conn, filter).map_err(|e| {
         log::error!("[stats] failed to query daily stats: {e}");
         e.to_string()
     })?;
-    let week = queries::get_weekly_stats(&conn).map_err(|e| {
+    let week = queries::get_weekly_stats(&conn, filter).map_err(|e| {
         log::error!("[stats] failed to query weekly stats: {e}");
         e.to_string()
     })?;
-    let streak = queries::get_streak(&conn).map_err(|e| {
+    let streak = queries::get_streak(&conn, filter).map_err(|e| {
         log::error!("[stats] failed to query streak: {e}");
         e.to_string()
     })?;
@@ -356,17 +438,21 @@ pub fn stats_get_detailed(db: State<'_, DbState>) -> Result<DetailedStats, Strin
 
 /// Heatmap data + lifetime totals for the All Time tab.
 #[tauri::command]
-pub fn stats_get_heatmap(db: State<'_, DbState>) -> Result<HeatmapStats, String> {
+pub fn stats_get_heatmap(
+    subject: Option<SubjectFilter>,
+    db: State<'_, DbState>,
+) -> Result<HeatmapStats, String> {
+    let filter = subject.unwrap_or_default();
     let conn = db.lock().map_err(|e| e.to_string())?;
-    let entries = queries::get_heatmap_data(&conn).map_err(|e| {
+    let entries = queries::get_heatmap_data(&conn, filter).map_err(|e| {
         log::error!("[stats] failed to query heatmap data: {e}");
         e.to_string()
     })?;
-    let raw = queries::get_all_time_stats(&conn).map_err(|e| {
+    let raw = queries::get_all_time_stats(&conn, filter).map_err(|e| {
         log::error!("[stats] failed to query all-time stats: {e}");
         e.to_string()
     })?;
-    let streak = queries::get_streak(&conn).map_err(|e| {
+    let streak = queries::get_streak(&conn, filter).map_err(|e| {
         log::error!("[stats] failed to query streak for heatmap: {e}");
         e.to_string()
     })?;
@@ -376,6 +462,489 @@ pub fn stats_get_heatmap(db: State<'_, DbState>) -> Result<HeatmapStats, String>
         total_hours: (raw.total_work_secs / 3600) as u32,
         longest_streak: streak.longest,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Subject commands
+// ---------------------------------------------------------------------------
+
+/// All subjects. Archived ones are excluded unless `include_archived` is true.
+#[tauri::command]
+pub fn subjects_list(
+    include_archived: Option<bool>,
+    db: State<'_, DbState>,
+) -> Result<Vec<Subject>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    subjects::list(&conn, include_archived.unwrap_or(false)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn subjects_create(
+    name: String,
+    color: String,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Subject, String> {
+    let subject = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        subjects::create(&conn, &name, &color).map_err(|e| e.to_string())?
+    };
+    app.emit("subjects:changed", ()).ok();
+    Ok(subject)
+}
+
+/// Patch a subject. Omitted fields are left untouched.
+#[tauri::command]
+pub fn subjects_update(
+    id: i64,
+    name: Option<String>,
+    color: Option<String>,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Subject, String> {
+    let subject = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        subjects::update(&conn, id, name.as_deref(), color.as_deref())
+            .map_err(|e| e.to_string())?
+    };
+    app.emit("subjects:changed", ()).ok();
+    Ok(subject)
+}
+
+#[tauri::command]
+pub fn subjects_set_archived(
+    id: i64,
+    archived: bool,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Subject, String> {
+    let subject = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        subjects::set_archived(&conn, id, archived).map_err(|e| e.to_string())?
+    };
+    app.emit("subjects:changed", ()).ok();
+    Ok(subject)
+}
+
+/// Delete a subject. Sessions recorded against it are kept and become
+/// uncategorised — the caller should make that clear in its confirmation.
+#[tauri::command]
+pub fn subjects_delete(
+    id: i64,
+    db: State<'_, DbState>,
+    timer: State<'_, TimerController>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let cleared_active = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        subjects::delete(&conn, id).map_err(|e| e.to_string())?;
+
+        // If the deleted subject was the active one, drop the selection too,
+        // otherwise new rounds would keep pointing at a row that is gone.
+        // The active task clears with it — it necessarily belonged to this
+        // subject (tasks_set_active pins the two together).
+        let s = settings::load(&conn).map_err(|e| e.to_string())?;
+        if s.active_subject_id == Some(id) {
+            settings::save_setting(&conn, "active_subject_id", "")
+                .map_err(|e| e.to_string())?;
+            settings::save_setting(&conn, "active_task_id", "").map_err(|e| e.to_string())?;
+            Some(settings::load(&conn).map_err(|e| e.to_string())?)
+        } else {
+            None
+        }
+    };
+    if let Some(new_settings) = cleared_active {
+        timer.apply_settings(new_settings.clone());
+        app.emit("settings:changed", &new_settings).ok();
+    }
+    app.emit("subjects:changed", ()).ok();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn subjects_reorder(
+    ids: Vec<i64>,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    {
+        let mut conn = db.lock().map_err(|e| e.to_string())?;
+        subjects::reorder(&mut conn, &ids).map_err(|e| e.to_string())?;
+    }
+    app.emit("subjects:changed", ()).ok();
+    Ok(())
+}
+
+/// Select the subject new work rounds are attributed to (`None` clears it).
+///
+/// Always clears `active_task_id` too — this is the coarse picker (in the
+/// timer window), and `active_task_id` must never point at a task from a
+/// different subject. Picking a *specific* task (which pins its subject as a
+/// side effect) goes through `tasks_set_active` instead.
+///
+/// A round already under way is re-tagged as well: the session row is written
+/// on the first tick, so without this, fixing a wrong subject mid-round would
+/// silently apply only from the next round.
+#[tauri::command]
+pub fn subjects_set_active(
+    id: Option<i64>,
+    db: State<'_, DbState>,
+    timer: State<'_, TimerController>,
+    app: AppHandle,
+) -> Result<Settings, String> {
+    let new_settings = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        if let Some(id) = id {
+            // Reject unknown ids rather than storing a dangling reference.
+            subjects::get(&conn, id).map_err(|e| e.to_string())?;
+        }
+        let value = id.map(|v| v.to_string()).unwrap_or_default();
+        settings::save_setting(&conn, "active_subject_id", &value)
+            .map_err(|e| e.to_string())?;
+        settings::save_setting(&conn, "active_task_id", "").map_err(|e| e.to_string())?;
+        if let Err(e) = queries::retag_open_work_session(&conn, id, None) {
+            log::warn!("[subjects] failed to re-tag the in-flight session: {e}");
+        }
+        settings::load(&conn).map_err(|e| e.to_string())?
+    };
+    log::info!("[subjects] active subject set to {id:?}");
+    timer.apply_settings(new_settings.clone());
+    app.emit("settings:changed", &new_settings).ok();
+    Ok(new_settings)
+}
+
+/// Focus time per subject. `days` limits the window (`None` = all time).
+#[tauri::command]
+pub fn stats_get_subject_breakdown(
+    days: Option<u32>,
+    db: State<'_, DbState>,
+) -> Result<Vec<queries::SubjectTotal>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    queries::get_subject_breakdown(&conn, days).map_err(|e| {
+        log::error!("[stats] failed to query subject breakdown: {e}");
+        e.to_string()
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Task commands
+// ---------------------------------------------------------------------------
+
+/// All tasks. Done ones are excluded unless `include_done` is true.
+/// The frontend buckets the flat list into per-subject sections itself.
+#[tauri::command]
+pub fn tasks_list(
+    include_done: Option<bool>,
+    db: State<'_, DbState>,
+) -> Result<Vec<Task>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    tasks::list(&conn, include_done.unwrap_or(false)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn tasks_create(
+    title: String,
+    subject_id: Option<i64>,
+    est_minutes: Option<u32>,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Task, String> {
+    let task = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        tasks::create(&conn, &title, subject_id, est_minutes).map_err(|e| e.to_string())?
+    };
+    app.emit("tasks:changed", ()).ok();
+    Ok(task)
+}
+
+#[tauri::command]
+pub fn tasks_rename(
+    id: i64,
+    title: String,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Task, String> {
+    let task = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        tasks::rename(&conn, id, &title).map_err(|e| e.to_string())?
+    };
+    app.emit("tasks:changed", ()).ok();
+    Ok(task)
+}
+
+/// `est_minutes: None` clears the estimate.
+#[tauri::command]
+pub fn tasks_set_estimate(
+    id: i64,
+    est_minutes: Option<u32>,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Task, String> {
+    let task = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        tasks::set_estimate(&conn, id, est_minutes).map_err(|e| e.to_string())?
+    };
+    app.emit("tasks:changed", ()).ok();
+    Ok(task)
+}
+
+/// Move a task to a different section. `subject_id: None` moves it to
+/// Uncategorised.
+#[tauri::command]
+pub fn tasks_move(
+    id: i64,
+    subject_id: Option<i64>,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Task, String> {
+    let task = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        tasks::move_to_subject(&conn, id, subject_id).map_err(|e| e.to_string())?
+    };
+    app.emit("tasks:changed", ()).ok();
+    Ok(task)
+}
+
+#[tauri::command]
+pub fn tasks_set_done(
+    id: i64,
+    done: bool,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Task, String> {
+    let task = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        tasks::set_done(&conn, id, done).map_err(|e| e.to_string())?
+    };
+    app.emit("tasks:changed", ()).ok();
+    Ok(task)
+}
+
+/// Delete a task. Sessions logged against it are kept and become
+/// unattributed — the caller should make that clear in its confirmation.
+#[tauri::command]
+pub fn tasks_delete(
+    id: i64,
+    db: State<'_, DbState>,
+    timer: State<'_, TimerController>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let cleared_active = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        tasks::delete(&conn, id).map_err(|e| e.to_string())?;
+        forget_active_task(&conn, id)?
+    };
+    if let Some(new_settings) = cleared_active {
+        timer.apply_settings(new_settings.clone());
+        app.emit("settings:changed", &new_settings).ok();
+    }
+    app.emit("tasks:changed", ()).ok();
+    Ok(())
+}
+
+/// After task `id` was deleted: if it was the active one, drop the pointer
+/// too — the subject stays selected, only the specific task clears. Returns
+/// the new settings when they changed.
+fn forget_active_task(conn: &rusqlite::Connection, id: i64) -> Result<Option<Settings>, String> {
+    let s = settings::load(conn).map_err(|e| e.to_string())?;
+    if s.active_task_id != Some(id) {
+        return Ok(None);
+    }
+    settings::save_setting(conn, "active_task_id", "").map_err(|e| e.to_string())?;
+    if let Err(e) = queries::retag_open_work_session(conn, s.active_subject_id, None) {
+        log::warn!("[tasks] failed to re-tag the in-flight session: {e}");
+    }
+    Ok(Some(settings::load(conn).map_err(|e| e.to_string())?))
+}
+
+#[tauri::command]
+pub fn tasks_reorder(
+    subject_id: Option<i64>,
+    ids: Vec<i64>,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    {
+        let mut conn = db.lock().map_err(|e| e.to_string())?;
+        tasks::reorder(&mut conn, subject_id, &ids).map_err(|e| e.to_string())?;
+    }
+    app.emit("tasks:changed", ()).ok();
+    Ok(())
+}
+
+/// Select the task new work rounds are attributed to (`None` clears it).
+///
+/// Picking a task pins its subject too (`active_subject_id` is set to the
+/// task's own subject) — the two must always agree. Clearing the task
+/// (`id: None`) leaves the subject selection untouched; you can still be
+/// generally working on a subject without a specific item picked.
+///
+/// A round already under way is re-tagged as well, same reasoning as
+/// `subjects_set_active`.
+#[tauri::command]
+pub fn tasks_set_active(
+    id: Option<i64>,
+    db: State<'_, DbState>,
+    timer: State<'_, TimerController>,
+    app: AppHandle,
+) -> Result<Settings, String> {
+    let new_settings = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        let subject_id = match id {
+            Some(task_id) => {
+                let task = tasks::get(&conn, task_id).map_err(|e| e.to_string())?;
+                settings::save_setting(
+                    &conn,
+                    "active_subject_id",
+                    &task.subject_id.map(|v| v.to_string()).unwrap_or_default(),
+                )
+                .map_err(|e| e.to_string())?;
+                task.subject_id
+            }
+            // Keep whatever subject was already active; only the task clears.
+            None => settings::load(&conn).map_err(|e| e.to_string())?.active_subject_id,
+        };
+        settings::save_setting(&conn, "active_task_id", &id.map(|v| v.to_string()).unwrap_or_default())
+            .map_err(|e| e.to_string())?;
+        if let Err(e) = queries::retag_open_work_session(&conn, subject_id, id) {
+            log::warn!("[tasks] failed to re-tag the in-flight session: {e}");
+        }
+        settings::load(&conn).map_err(|e| e.to_string())?
+    };
+    log::info!("[tasks] active task set to {id:?}");
+    timer.apply_settings(new_settings.clone());
+    app.emit("settings:changed", &new_settings).ok();
+    Ok(new_settings)
+}
+
+// ---------------------------------------------------------------------------
+// Jot commands (碎碎念)
+// ---------------------------------------------------------------------------
+
+/// Every jot: open ones newest first, then handled ones.
+#[tauri::command]
+pub fn jots_list(db: State<'_, DbState>) -> Result<Vec<Jot>, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    jots::list(&conn).map_err(|e| e.to_string())
+}
+
+/// Write a jot down. Where it came up (active subject, focus round under way)
+/// is read here from the timer, not trusted from the caller.
+#[tauri::command]
+pub fn jots_create(
+    body: String,
+    db: State<'_, DbState>,
+    timer: State<'_, TimerController>,
+    app: AppHandle,
+) -> Result<Jot, String> {
+    let snap = timer.get_snapshot();
+    let jot = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        let context = jots::Context {
+            subject_id: settings::load(&conn).map_err(|e| e.to_string())?.active_subject_id,
+            in_focus: snap.round_type == "work" && (snap.is_running || snap.is_paused),
+        };
+        jots::create(&conn, &body, context).map_err(|e| e.to_string())?
+    };
+    app.emit("jots:changed", ()).ok();
+    Ok(jot)
+}
+
+#[tauri::command]
+pub fn jots_edit(id: i64, body: String, db: State<'_, DbState>, app: AppHandle) -> Result<Jot, String> {
+    let jot = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        jots::edit(&conn, id, &body).map_err(|e| e.to_string())?
+    };
+    app.emit("jots:changed", ()).ok();
+    Ok(jot)
+}
+
+/// Cross a jot off, or bring it back.
+#[tauri::command]
+pub fn jots_set_done(id: i64, done: bool, db: State<'_, DbState>, app: AppHandle) -> Result<Jot, String> {
+    let jot = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        jots::set_done(&conn, id, done).map_err(|e| e.to_string())?
+    };
+    app.emit("jots:changed", ()).ok();
+    Ok(jot)
+}
+
+/// Turn a jot into a task in `subject_id`'s section (`None` = Uncategorised).
+#[tauri::command]
+pub fn jots_to_task(
+    id: i64,
+    subject_id: Option<i64>,
+    db: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<Task, String> {
+    let (_, task) = {
+        let mut conn = db.lock().map_err(|e| e.to_string())?;
+        jots::to_task(&mut conn, id, subject_id).map_err(|e| e.to_string())?
+    };
+    app.emit("jots:changed", ()).ok();
+    app.emit("tasks:changed", ()).ok();
+    Ok(task)
+}
+
+/// Undo `jots_to_task`: removes the task it made and reopens the jot.
+#[tauri::command]
+pub fn jots_untask(
+    id: i64,
+    db: State<'_, DbState>,
+    timer: State<'_, TimerController>,
+    app: AppHandle,
+) -> Result<Jot, String> {
+    let (jot, cleared_active) = {
+        let mut conn = db.lock().map_err(|e| e.to_string())?;
+        let (jot, removed) = jots::untask(&mut conn, id).map_err(|e| e.to_string())?;
+        let cleared = match removed {
+            Some(task_id) => forget_active_task(&conn, task_id)?,
+            None => None,
+        };
+        (jot, cleared)
+    };
+    if let Some(new_settings) = cleared_active {
+        timer.apply_settings(new_settings.clone());
+        app.emit("settings:changed", &new_settings).ok();
+    }
+    app.emit("jots:changed", ()).ok();
+    app.emit("tasks:changed", ()).ok();
+    Ok(jot)
+}
+
+/// Delete a jot; returns it so `jots_restore` can put it back.
+#[tauri::command]
+pub fn jots_delete(id: i64, db: State<'_, DbState>, app: AppHandle) -> Result<Jot, String> {
+    let jot = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        jots::delete(&conn, id).map_err(|e| e.to_string())?
+    };
+    app.emit("jots:changed", ()).ok();
+    Ok(jot)
+}
+
+#[tauri::command]
+pub fn jots_restore(jot: Jot, db: State<'_, DbState>, app: AppHandle) -> Result<Jot, String> {
+    let jot = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        jots::restore(&conn, &jot).map_err(|e| e.to_string())?
+    };
+    app.emit("jots:changed", ()).ok();
+    Ok(jot)
+}
+
+/// Delete every crossed-off or converted jot; returns how many.
+#[tauri::command]
+pub fn jots_clear_handled(db: State<'_, DbState>, app: AppHandle) -> Result<usize, String> {
+    let n = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        jots::clear_handled(&conn).map_err(|e| e.to_string())?
+    };
+    log::info!("[jots] cleared {n} handled jots");
+    app.emit("jots:changed", ()).ok();
+    Ok(n)
 }
 
 // ---------------------------------------------------------------------------
@@ -477,6 +1046,19 @@ pub fn audio_set_custom(
     Ok(display_name)
 }
 
+/// Play the button-click sound (red primary buttons), when enabled in settings.
+#[tauri::command]
+pub fn audio_play_click(db: State<'_, DbState>, app: AppHandle) -> Result<(), String> {
+    let enabled = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        settings::load(&conn).map_err(|e| e.to_string())?.click_sound_enabled
+    };
+    if let (true, Some(audio_state)) = (enabled, app.try_state::<Arc<AudioManager>>()) {
+        audio_state.play_cue(audio::AudioCue::ButtonClick);
+    }
+    Ok(())
+}
+
 /// Restore the built-in sound for the given cue slot by deleting the custom file.
 #[tauri::command]
 pub fn audio_clear_custom(
@@ -540,6 +1122,7 @@ pub fn audio_get_custom_info(
     info.work_alert = override_name(&info.work_alert, "custom_work_alert_name");
     info.short_break_alert = override_name(&info.short_break_alert, "custom_short_break_alert_name");
     info.long_break_alert = override_name(&info.long_break_alert, "custom_long_break_alert_name");
+    info.button_click = override_name(&info.button_click, "custom_button_click_name");
 
     Ok(info)
 }
@@ -713,6 +1296,7 @@ fn cue_to_stem(cue: &str) -> Result<&'static str, String> {
         "work_alert" => Ok(audio::STEM_WORK),
         "short_break_alert" => Ok(audio::STEM_SHORT),
         "long_break_alert" => Ok(audio::STEM_LONG),
+        "button_click" => Ok(audio::STEM_CLICK),
         _ => Err(format!("unknown audio cue: '{cue}'")),
     }
 }
@@ -722,6 +1306,7 @@ fn cue_to_name_key(cue: &str) -> Result<&'static str, String> {
         "work_alert" => Ok("custom_work_alert_name"),
         "short_break_alert" => Ok("custom_short_break_alert_name"),
         "long_break_alert" => Ok("custom_long_break_alert_name"),
+        "button_click" => Ok("custom_button_click_name"),
         _ => Err(format!("unknown audio cue: '{cue}'")),
     }
 }
